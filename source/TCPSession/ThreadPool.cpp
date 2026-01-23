@@ -32,5 +32,5 @@ ThreadPool::~ThreadPool(){
         stop = true;
     }
     cv.notify_all();
-    for (auto& t : workers) t.join();
+    for(auto& t : workers) t.join();
 }

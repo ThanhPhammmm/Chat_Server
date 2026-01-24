@@ -5,6 +5,19 @@
 #include <iostream>
 #include <unistd.h>
 #include <sys/socket.h>
+#include <unordered_map>
+#include <functional>
+#include <sys/epoll.h>
+#include <cstring>
+#include <mutex>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/socket.h>
+#include <iostream>
+#include <cstring>
+#include <cerrno>
+#include <csignal>
 
 class Connection{
     private:

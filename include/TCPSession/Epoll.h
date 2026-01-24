@@ -1,12 +1,5 @@
 #pragma once
 
-#include <unordered_map>
-#include <functional>
-#include <sys/epoll.h>
-#include <unistd.h>
-#include <iostream>
-#include <cstring>
-#include <mutex>
 #include "Connection.h"
 
 class EpollInstance : public std::enable_shared_from_this<EpollInstance>{
@@ -22,6 +15,7 @@ class EpollInstance : public std::enable_shared_from_this<EpollInstance>{
     public:
         EpollInstance();
         ~EpollInstance();
+
 
         void addFd(int fd, Callback cb, ConnectionPtr conn = nullptr);
         void removeFd(int fd);

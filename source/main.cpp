@@ -1,8 +1,4 @@
 #include "TCPServer.h"
-#include "Epoll.h"
-#include "ThreadPool.h"
-#include <csignal>
-#include <iostream>
 
 EpollPtr g_epoll = nullptr;
 
@@ -22,13 +18,16 @@ int main(){
         auto thread_pool = std::make_shared<ThreadPool>(4);
         auto epoll_instance = std::make_shared<EpollInstance>();
         g_epoll = epoll_instance;
-        
+        auto chat_controller = std::make_shared<ChatController>();
+
         sockaddr_in addr{};
         addr.sin_family = AF_INET;
         addr.sin_addr.s_addr = INADDR_ANY;
         addr.sin_port = htons(8080);
+        auto server = std::make_shared<TCPServer>(addr, epoll_instance, thread_pool, chat_controller);
         
-        auto server = std::make_shared<TCPServer>(addr, epoll_instance, thread_pool);
+        auto reg1 = std::make_shared<PublicChatHandler>();
+        chat_controller->registerHandler(reg1);
         server->startServer();
         
         std::cout << "[INFO] Press Ctrl+C to stop\n";

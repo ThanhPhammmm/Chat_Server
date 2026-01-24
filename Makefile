@@ -1,9 +1,11 @@
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra -g
 INCLUDES = \
-	-Iinclude \
 	-Iinclude/TCPServer \
-	-Iinclude/TCPSession
+	-Iinclude/TCPSession \
+	-Iinclude/CommandHandler \
+	-Iinclude/MessageHandler \
+	-Iinclude/Controller
 
 RUN_DIR = RunProgram
 
@@ -12,10 +14,11 @@ CLIENT_TARGET = $(RUN_DIR)/chat_client
 
 SERVER_SRCS = \
 	source/main.cpp \
-	source/TCPServer/TCPServer.cpp \
-	source/TCPSession/Epoll.cpp \
-	source/TCPSession/ThreadPool.cpp \
-	source/TCPSession/Connection.cpp
+	source/TCPServer/*.cpp \
+	source/TCPSession/*.cpp \
+	source/CommandHandler/*.cpp \
+	source/Controller/*.cpp \
+	source/MessageHandler/*.cpp
 
 CLIENT_SRCS = source/Client/client.cpp
 

@@ -1,6 +1,5 @@
 #include "Epoll.h"
 
-
 EpollInstance::EpollInstance(){
     epfd = epoll_create1(0);
     if(epfd < 0){

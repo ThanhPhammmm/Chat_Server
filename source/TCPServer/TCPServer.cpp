@@ -11,9 +11,10 @@ static void setNonBlock(int fd){
     }
 }
 
-TCPServer::TCPServer(const sockaddr_in& addr, EpollPtr epoll, ThreadPoolPtr thread_pool)
+TCPServer::TCPServer(const sockaddr_in& addr, EpollPtr epoll, ThreadPoolPtr thread_pool, ChatControllerPtr controller)
     : epoll_instance(epoll), 
-      thread_pool_instance(thread_pool){ 
+      thread_pool_instance(thread_pool),
+      chat_controller(controller){ 
     
     listen_fd = socket(AF_INET, SOCK_STREAM, 0);
     if(listen_fd < 0){
@@ -56,6 +57,45 @@ TCPServer::~TCPServer(){
     }
 }
 
+void TCPServer::sendResponse(ConnectionPtr conn, const std::string& response) {
+    if(response.empty() || conn->isClosed()){
+        return;
+    }
+    
+    thread_pool_instance->submit([conn, response](){
+        if(conn->isClosed()) return;
+        
+        int fd = conn->getFd();
+        const char* data = response.data();
+        size_t remaining = response.size();
+        
+        while(remaining > 0){
+            if(conn->isClosed()) break;
+            
+            ssize_t sent = send(fd, data, remaining, MSG_NOSIGNAL);
+            
+            if(sent < 0){
+                if(errno == EAGAIN || errno == EWOULDBLOCK){
+                    usleep(1000);
+                    continue;
+                }
+                perror("send");
+                break;
+            }   
+            data += sent;
+            remaining -= sent;
+        }
+    });
+}
+
+// void TCPServer::broadcastMessage(const std::string& message, int exclude_fd) {
+//     for(auto [fd, conn] : epoll_instance->connections){
+//         if(fd != exclude_fd && !conn->isClosed()){
+//             sendResponse(conn, message);
+//         }
+//     }
+// }
+
 void TCPServer::onRead(int clientFd){
     ConnectionPtr conn = epoll_instance->getConnection(clientFd);
     if(!conn || conn->isClosed()){
@@ -81,39 +121,11 @@ void TCPServer::onRead(int clientFd){
             return;
         }
         
-        std::string msg(buf, n);
+        std::string message(buf, n);
         
-        thread_pool_instance->submit([conn, msg](){
-            if(conn->isClosed()){
-                return;
-            }
-            
-            int fd = conn->getFd();
-            std::cout << "[Client " << fd << "]: " << msg << std::endl;
-            
-            // const char* data = msg.data();
-            // size_t remaining = msg.size();
-            
-            // while(remaining > 0){
-            //     if(conn->isClosed()){
-            //         break;
-            //     }
-                
-            //     ssize_t sent = send(fd, data, remaining, MSG_NOSIGNAL);
-                
-            //     if(sent < 0){
-            //         if(errno == EAGAIN || errno == EWOULDBLOCK){
-            //             usleep(1000);
-            //             continue;
-            //         }
-            //         perror("send");
-            //         break;
-            //     }
-                
-            //     data += sent;
-            //     remaining -= sent;
-            // }
-        });
+        std::string response = chat_controller->handlerMessage(conn, message);
+        std::cout << "[DEBUG] Response: " << response << std::endl;
+        //sendResponse(conn, response);
     }
 }
 

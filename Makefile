@@ -5,7 +5,9 @@ INCLUDES = \
 	-Iinclude/TCPSession \
 	-Iinclude/CommandHandler \
 	-Iinclude/MessageHandler \
-	-Iinclude/Controller
+	-Iinclude/Controller \
+	-Iinclude/ThreadHandler \
+	-Iinclude/ThreadMessageHandler
 
 RUN_DIR = RunProgram
 
@@ -18,7 +20,8 @@ SERVER_SRCS = \
 	source/TCPSession/*.cpp \
 	source/CommandHandler/*.cpp \
 	source/Controller/*.cpp \
-	source/MessageHandler/*.cpp
+	source/MessageHandler/*.cpp \
+	source/ThreadHandler/*.cpp \
 
 CLIENT_SRCS = source/Client/client.cpp
 

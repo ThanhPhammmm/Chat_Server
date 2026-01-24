@@ -68,7 +68,7 @@ ConnectionPtr EpollInstance::getConnection(int fd){
 void EpollInstance::run(){
     epoll_event events[1024];
 
-    while(!should_stop){
+    while(!should_stop.load()){  // ✓ Use atomic load
         int n = epoll_wait(epfd, events, 1024, 1000);
         
         if(n < 0){
@@ -101,5 +101,5 @@ void EpollInstance::run(){
 }
 
 void EpollInstance::stop(){
-    should_stop = true;
+    should_stop.store(true);
 }

@@ -11,10 +11,13 @@ static void setNonBlock(int fd){
     }
 }
 
-TCPServer::TCPServer(const sockaddr_in& addr, EpollPtr epoll, ThreadPoolPtr thread_pool, ChatControllerPtr controller)
+TCPServer::TCPServer(const sockaddr_in& addr, 
+                     EpollPtr epoll, 
+                     ThreadPoolPtr thread_pool,
+                     std::shared_ptr<MessageQueue<Message>> to_router)
     : epoll_instance(epoll), 
       thread_pool_instance(thread_pool),
-      chat_controller(controller){ 
+      to_router_queue(to_router){ 
     
     listen_fd = socket(AF_INET, SOCK_STREAM, 0);
     if(listen_fd < 0){
@@ -57,45 +60,6 @@ TCPServer::~TCPServer(){
     }
 }
 
-void TCPServer::sendResponse(ConnectionPtr conn, const std::string& response) {
-    if(response.empty() || conn->isClosed()){
-        return;
-    }
-    
-    thread_pool_instance->submit([conn, response](){
-        if(conn->isClosed()) return;
-        
-        int fd = conn->getFd();
-        const char* data = response.data();
-        size_t remaining = response.size();
-        
-        while(remaining > 0){
-            if(conn->isClosed()) break;
-            
-            ssize_t sent = send(fd, data, remaining, MSG_NOSIGNAL);
-            
-            if(sent < 0){
-                if(errno == EAGAIN || errno == EWOULDBLOCK){
-                    usleep(1000);
-                    continue;
-                }
-                perror("send");
-                break;
-            }   
-            data += sent;
-            remaining -= sent;
-        }
-    });
-}
-
-// void TCPServer::broadcastMessage(const std::string& message, int exclude_fd) {
-//     for(auto [fd, conn] : epoll_instance->connections){
-//         if(fd != exclude_fd && !conn->isClosed()){
-//             sendResponse(conn, message);
-//         }
-//     }
-// }
-
 void TCPServer::onRead(int clientFd){
     ConnectionPtr conn = epoll_instance->getConnection(clientFd);
     if(!conn || conn->isClosed()){
@@ -110,22 +74,39 @@ void TCPServer::onRead(int clientFd){
             if(errno == EAGAIN || errno == EWOULDBLOCK){
                 break;
             }
+            
             perror("recv");
+            
+            Message msg;
+            msg.type = MessageType::CLIENT_DISCONNECTED;
+            msg.payload = ClientDisconnected{clientFd};
+            to_router_queue->push(std::move(msg));
+            
             epoll_instance->removeFd(clientFd);
             return;
         }
         
         if(n == 0){
             std::cout << "[INFO] Client closed connection fd=" << clientFd << std::endl;
+            
+            Message msg;
+            msg.type = MessageType::CLIENT_DISCONNECTED;
+            msg.payload = ClientDisconnected{clientFd};
+            to_router_queue->push(std::move(msg));
+            
             epoll_instance->removeFd(clientFd);
             return;
         }
         
-        std::string message(buf, n);
+        std::string content(buf, n);
         
-        std::string response = chat_controller->handlerMessage(conn, message);
-        std::cout << "[DEBUG] Response: " << response << std::endl;
-        //sendResponse(conn, response);
+        Message msg;
+        msg.type = MessageType::INCOMING_MESSAGE;
+        msg.payload = IncomingMessage{conn, content, clientFd};
+        to_router_queue->push(std::move(msg));
+        
+        std::cout << "[TCPServer] Pushed message from fd=" << clientFd 
+                  << " to router queue\n";
     }
 }
 

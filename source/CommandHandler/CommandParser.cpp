@@ -9,7 +9,6 @@ CommandPtr CommandParser::parse(std::string& message){
     }
 
     if(message[0] != '/'){
-        // Default command
         cmd->type = CommandType::PUBLIC_CHAT;
         cmd->args.push_back(message);
         return cmd;
@@ -33,10 +32,10 @@ CommandPtr CommandParser::parse(std::string& message){
     else if(command_name == "/list_users"){
         cmd->type = CommandType::LIST_USERS;
     } 
-    else if(command_name == "/private_chat"){
+    else if(command_name == "/private_chat" || command_name == "/msg"){
         cmd->type = CommandType::PRIVATE_CHAT;
     } 
-    else if(command_name == "/public_chat"){
+    else if(command_name == "/public_chat" || command_name == "/all"){
         cmd->type = CommandType::PUBLIC_CHAT;
     }
     else{

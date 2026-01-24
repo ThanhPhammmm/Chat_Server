@@ -18,6 +18,8 @@
 #include <cstring>
 #include <cerrno>
 #include <csignal>
+#include <variant>
+#include <thread>
 
 class Connection{
     private:

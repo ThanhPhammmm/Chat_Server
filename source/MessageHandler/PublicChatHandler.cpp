@@ -9,6 +9,16 @@ std::string PublicChatHandler::handleMessage(ConnectionPtr conn, CommandPtr comm
         return "Error: No message provided for public chat.";
     }
 
-    std::string chat_message = "[Public] " + std::to_string(conn->getFd()) + ": " + command->args[0];
+    std::string full_message = command->args[0];
+    for(size_t i = 1; i < command->args.size(); i++){
+        full_message += " " + command->args[i];
+    }
+
+    // ✓ Format response
+    std::string chat_message = "[Public] fd=" 
+                              + std::to_string(conn->getFd()) 
+                              + ": " 
+                              + full_message;
+    
     return chat_message;
 }

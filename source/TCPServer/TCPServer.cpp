@@ -91,28 +91,28 @@ void TCPServer::onRead(int clientFd){
             int fd = conn->getFd();
             std::cout << "[Client " << fd << "]: " << msg << std::endl;
             
-            const char* data = msg.data();
-            size_t remaining = msg.size();
+            // const char* data = msg.data();
+            // size_t remaining = msg.size();
             
-            while(remaining > 0){
-                if(conn->isClosed()){
-                    break;
-                }
+            // while(remaining > 0){
+            //     if(conn->isClosed()){
+            //         break;
+            //     }
                 
-                ssize_t sent = send(fd, data, remaining, MSG_NOSIGNAL);
+            //     ssize_t sent = send(fd, data, remaining, MSG_NOSIGNAL);
                 
-                if(sent < 0){
-                    if(errno == EAGAIN || errno == EWOULDBLOCK){
-                        usleep(1000);
-                        continue;
-                    }
-                    perror("send");
-                    break;
-                }
+            //     if(sent < 0){
+            //         if(errno == EAGAIN || errno == EWOULDBLOCK){
+            //             usleep(1000);
+            //             continue;
+            //         }
+            //         perror("send");
+            //         break;
+            //     }
                 
-                data += sent;
-                remaining -= sent;
-            }
+            //     data += sent;
+            //     remaining -= sent;
+            // }
         });
     }
 }

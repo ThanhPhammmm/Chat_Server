@@ -21,19 +21,8 @@ class EpollInstance : public std::enable_shared_from_this<EpollInstance>{
         ConnectionPtr getConnection(int fd);
         void run();
         void stop();
-        
-        bool isStopped() const {
-            return should_stop.load();
-        }
-        
-        std::vector<ConnectionPtr> getAllConnections() {
-            std::lock_guard<std::mutex> lock(handlers_mutex);
-            std::vector<ConnectionPtr> conns;
-            for(const auto& pair : connections) {
-                conns.push_back(pair.second);
-            }
-            return conns;
-        }
+        bool isStopped() const;
+        std::vector<ConnectionPtr> getAllConnections();
 };
 
 using EpollPtr = std::shared_ptr<EpollInstance>;

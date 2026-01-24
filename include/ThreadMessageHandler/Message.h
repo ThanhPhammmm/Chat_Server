@@ -4,40 +4,40 @@
 
 enum class MessageType {
     INCOMING_MESSAGE,    // Client → Server
-    OUTGOING_RESPONSE,   // Server → Client
-    BROADCAST,           // Server → All Clients
-    CLIENT_DISCONNECTED,
+    // OUTGOING_RESPONSE,   // Server → Client
+    // BROADCAST,           // Server → All Clients
+    // CLIENT_DISCONNECTED,
     SHUTDOWN
 };
 
-struct IncomingMessage {
+struct IncomingMessage{
     ConnectionPtr connection;
     std::string content;
     int fd;
 };
 
-struct OutgoingResponse {
+struct OutgoingResponse{
     ConnectionPtr connection;
     std::string content;
 };
 
-struct BroadcastMessage {
-    std::string content;
-    int exclude_fd;
-};
+// struct BroadcastMessage{
+//     std::string content;
+//     int exclude_fd;
+// };
 
-struct ClientDisconnected {
-    int fd;
-};
+// struct ClientDisconnected{
+//     int fd;
+// };
 
 using MessagePayload = std::variant<
     IncomingMessage,
-    OutgoingResponse,
-    BroadcastMessage,
-    ClientDisconnected
+    OutgoingResponse
+    // BroadcastMessage,
+    // ClientDisconnected
 >;
 
-struct Message {
+struct Message{
     MessageType type;
     MessagePayload payload;
 };

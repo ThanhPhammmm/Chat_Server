@@ -1,10 +1,10 @@
 #include "PublicChatHandler.h"
 
-bool PublicChatHandler::canHandle(CommandType type) {
+bool PublicChatHandler::canHandle(CommandType type){
     return type == CommandType::PUBLIC_CHAT;
 }
 
-std::string PublicChatHandler::handleMessage(ConnectionPtr conn, CommandPtr command) {
+std::string PublicChatHandler::handleMessage(ConnectionPtr conn, CommandPtr command){
     if(command->args.empty()){
         return "Error: No message provided for public chat.";
     }
@@ -14,7 +14,6 @@ std::string PublicChatHandler::handleMessage(ConnectionPtr conn, CommandPtr comm
         full_message += " " + command->args[i];
     }
 
-    // ✓ Format response
     std::string chat_message = "[Public] fd=" 
                               + std::to_string(conn->getFd()) 
                               + ": " 

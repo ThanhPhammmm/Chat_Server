@@ -2,7 +2,7 @@
 
 #include "Command.h"
 
-class CommandParser {
+class CommandParser{
     public:
         CommandPtr parse(std::string& raw_message);
 };

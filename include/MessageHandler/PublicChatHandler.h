@@ -2,7 +2,7 @@
 
 #include "MessageHandler.h"
 
-class PublicChatHandler : public MessageHandler {
+class PublicChatHandler : public MessageHandler{
     public:
         std::string handleMessage(ConnectionPtr conn, CommandPtr command) override;
         bool canHandle(CommandType type) override;

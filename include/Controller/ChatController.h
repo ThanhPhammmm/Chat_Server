@@ -4,7 +4,7 @@
 #include "MessageHandler.h"
 #include "Connection.h"
 
-class ChatController {
+class ChatController{
     private:
         std::vector<MessageHandlerPtr> handlers;
 

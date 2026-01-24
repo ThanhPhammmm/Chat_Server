@@ -8,7 +8,7 @@
 #include <iostream>
 #include <stdint.h>
 
-enum class CommandType {
+enum class CommandType{
     LOGIN,
     LOGOUT,
     PUBLIC_CHAT,
@@ -17,7 +17,7 @@ enum class CommandType {
     UNKNOWN
 };
 
-class Command {
+class Command{
     public:
         CommandType type;
         std::vector<std::string> args;

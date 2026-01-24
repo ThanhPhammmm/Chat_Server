@@ -36,7 +36,10 @@ void Responser::run(){
         if(resp->is_broadcast){
             //broadcastMessage(resp);
         } 
-        else {
+        else if(resp->is_public){
+            std::cout << resp->response_message << "\n"; 
+        }
+        else{
             sendToClient(resp);
         }
     }
@@ -59,7 +62,7 @@ void Responser::sendToClient(HandlerResponsePtr resp){
             ssize_t sent = send(fd, data, remaining, MSG_NOSIGNAL);
             
             if(sent < 0){
-                if(errno == EAGAIN || errno == EWOULDBLOCK) {
+                if(errno == EAGAIN || errno == EWOULDBLOCK){
                     usleep(1000);
                     continue;
                 }
@@ -73,7 +76,7 @@ void Responser::sendToClient(HandlerResponsePtr resp){
     });
 }
 
-// void broadcastMessage(HandlerResponsePtr resp) {
+// void broadcastMessage(HandlerResponsePtr resp){
 //     // Get all connections from epoll
 //     // For each connection (except exclude_fd), send message
     

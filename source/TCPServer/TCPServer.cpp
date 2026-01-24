@@ -77,24 +77,24 @@ void TCPServer::onRead(int clientFd){
             
             perror("recv");
             
-            Message msg;
-            msg.type = MessageType::CLIENT_DISCONNECTED;
-            msg.payload = ClientDisconnected{clientFd};
-            to_router_queue->push(std::move(msg));
+            // Message msg;
+            // msg.type = MessageType::CLIENT_DISCONNECTED;
+            // msg.payload = ClientDisconnected{clientFd};
+            // to_router_queue->push(std::move(msg));
             
-            epoll_instance->removeFd(clientFd);
+            // epoll_instance->removeFd(clientFd);
             return;
         }
         
         if(n == 0){
-            std::cout << "[INFO] Client closed connection fd=" << clientFd << std::endl;
+            // std::cout << "[INFO] Client closed connection fd=" << clientFd << std::endl;
             
-            Message msg;
-            msg.type = MessageType::CLIENT_DISCONNECTED;
-            msg.payload = ClientDisconnected{clientFd};
-            to_router_queue->push(std::move(msg));
+            // Message msg;
+            // msg.type = MessageType::CLIENT_DISCONNECTED;
+            // msg.payload = ClientDisconnected{clientFd};
+            // to_router_queue->push(std::move(msg));
             
-            epoll_instance->removeFd(clientFd);
+            // epoll_instance->removeFd(clientFd);
             return;
         }
         

@@ -3,7 +3,7 @@
 #include "Command.h"
 #include "Connection.h"
 
-class MessageHandler {
+class MessageHandler{
     public:
         virtual ~MessageHandler() = default;
         virtual std::string handleMessage(ConnectionPtr conn, CommandPtr command) = 0;

@@ -54,6 +54,7 @@ void EpollInstance::removeFd(int fd){
     if(conn){
         conn->close();
     }
+    std::cout << "[INFO] Closed connection fd=" << fd << std::endl;
 }
 
 ConnectionPtr EpollInstance::getConnection(int fd){
@@ -68,7 +69,7 @@ ConnectionPtr EpollInstance::getConnection(int fd){
 void EpollInstance::run(){
     epoll_event events[1024];
 
-    while(!should_stop.load()){  // ✓ Use atomic load
+    while(!should_stop.load()){
         int n = epoll_wait(epfd, events, 1024, 1000);
         
         if(n < 0){
@@ -82,7 +83,7 @@ void EpollInstance::run(){
             uint32_t ev = events[i].events;
             
             if(ev & (EPOLLERR | EPOLLHUP | EPOLLRDHUP)){
-                std::cout << "[INFO] Connection error/closed fd=" << fd << std::endl;
+                // std::cout << "[INFO] Connection error/closed fd=" << fd << std::endl;
                 removeFd(fd);
                 continue;
             }
@@ -102,4 +103,17 @@ void EpollInstance::run(){
 
 void EpollInstance::stop(){
     should_stop.store(true);
+}
+
+bool EpollInstance::isStopped() const{
+    return should_stop.load();
+}
+
+std::vector<ConnectionPtr> EpollInstance::getAllConnections(){
+    std::lock_guard<std::mutex> lock(handlers_mutex);
+    std::vector<ConnectionPtr> conns;
+    for(const auto& pair : connections){
+        conns.push_back(pair.second);
+    }
+    return conns;
 }

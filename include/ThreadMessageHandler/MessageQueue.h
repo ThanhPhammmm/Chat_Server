@@ -1,12 +1,14 @@
 #pragma once
+
 #include <queue>
 #include <mutex>
 #include <condition_variable>
 #include <optional>
 #include <memory>
+#include <chrono>
 
 template<typename T>
-class MessageQueue {
+class MessageQueue{
     private:
         std::queue<T> queue;
         std::mutex mtx;
@@ -14,7 +16,7 @@ class MessageQueue {
         bool stopped = false;
 
     public:
-        void push(T item) {
+        void push(T item){
             {
                 std::lock_guard<std::mutex> lock(mtx);
                 if(stopped) return;
@@ -23,21 +25,22 @@ class MessageQueue {
             cv.notify_one();
         }
 
-        std::optional<T> pop(int timeout_ms = -1) {
+        std::optional<T> pop(int timeout_ms = -1){
             std::unique_lock<std::mutex> lock(mtx);
             
-            if(timeout_ms < 0) {
+            if(timeout_ms < 0){
                 cv.wait(lock, [this]{ return stopped || !queue.empty(); });
-            } else {
+            } 
+            else{
                 cv.wait_for(lock, std::chrono::milliseconds(timeout_ms),
                     [this]{ return stopped || !queue.empty(); });
             }
             
-            if(stopped && queue.empty()) {
+            if(stopped && queue.empty()){
                 return std::nullopt;
             }
             
-            if(queue.empty()) {
+            if(queue.empty()){
                 return std::nullopt;
             }
             
@@ -46,7 +49,7 @@ class MessageQueue {
             return item;
         }
 
-        void stop() {
+        void stop(){
             {
                 std::lock_guard<std::mutex> lock(mtx);
                 stopped = true;
@@ -54,7 +57,7 @@ class MessageQueue {
             cv.notify_all();
         }
 
-        size_t size() {
+        size_t size(){
             std::lock_guard<std::mutex> lock(mtx);
             return queue.size();
         }

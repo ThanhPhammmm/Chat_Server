@@ -15,10 +15,10 @@ void ChatControllerThread::start(){
 void ChatControllerThread::stop(){
     running.store(false);
     incoming_queue->stop();
-    for(auto& pair : handler_queues) {
+    for(auto& pair : handler_queues){
         pair.second->stop();
     }
-    if(worker_thread.joinable()) {
+    if(worker_thread.joinable()){
         worker_thread.join();
     }
 }
@@ -38,14 +38,14 @@ void ChatControllerThread::run(){
         
         auto msg = msg_opt.value();
         
-        switch(msg.type) {
+        switch(msg.type){
             case MessageType::INCOMING_MESSAGE:
                 routeMessage(std::get<IncomingMessage>(msg.payload), parser);
                 break;
                 
-            case MessageType::CLIENT_DISCONNECTED:
-                handleDisconnect(std::get<ClientDisconnected>(msg.payload));
-                break;
+            // case MessageType::CLIENT_DISCONNECTED:
+            //     handleDisconnect(std::get<ClientDisconnected>(msg.payload));
+            //     break;
                 
             case MessageType::SHUTDOWN:
                 running.store(false);
@@ -64,7 +64,7 @@ void ChatControllerThread::routeMessage(const IncomingMessage& incoming, Command
     auto cmd = parser.parse(content);
     
     auto it = handler_queues.find(cmd->type);
-    if(it == handler_queues.end()) {
+    if(it == handler_queues.end()){
         std::cout << "[Router] Unknown command type: " << (int)cmd->type << "\n";
         return;
     }
@@ -81,8 +81,8 @@ void ChatControllerThread::routeMessage(const IncomingMessage& incoming, Command
                 << " to handler for type " << (int)cmd->type << "\n";
 }
 
-void ChatControllerThread::handleDisconnect(const ClientDisconnected& disc){
-    int fd = disc.fd;
-    std::cout << "[Router] Handling disconnect for fd: " << fd << "\n";
-    // Additional cleanup logic can be added here
-}
+// void ChatControllerThread::handleDisconnect(const ClientDisconnected& disc){
+//     int fd = disc.fd;
+//     std::cout << "[Router] Handling disconnect for fd: " << fd << "\n";
+//     // Additional cleanup logic can be added here
+// }

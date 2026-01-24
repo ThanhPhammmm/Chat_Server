@@ -1,14 +1,12 @@
 #include "PublicChatHandlerThread.h"
 
-PublicChatHandlerThread::PublicChatHandlerThread(std::shared_ptr<PublicChatHandler> public_chat_handler,
+PublicChatHandlerThread::PublicChatHandlerThread(std::shared_ptr<PublicChatHandler> handler,
                                                  std::shared_ptr<MessageQueue<HandlerRequestPtr>> req_queue,
                                                  std::shared_ptr<MessageQueue<HandlerResponsePtr>> resp_queue) 
-    : BaseThreadHandler(public_chat_handler,
-                        req_queue,
-                        resp_queue,
-                        "PublicChatHandler"){}
+    : BaseThreadHandler(handler, req_queue, resp_queue, "PublicChatHandler"),
+      public_chat_handler(handler) {}
 
-void PublicChatHandlerThread :: run(){
+void PublicChatHandlerThread::run(){
     std::cout << "┌────────────────────────────────────┐\n";
     std::cout << "│ [PublicChatHandler] Started\n";
     std::cout << "│ TID: " << std::this_thread::get_id() << "\n";
@@ -21,7 +19,6 @@ void PublicChatHandlerThread :: run(){
         
         auto req = req_opt.value();
         
-        // Process request
         std::string response = public_chat_handler->handleMessage(req->connection, req->command);
         
         if(!response.empty()){
@@ -30,12 +27,14 @@ void PublicChatHandlerThread :: run(){
             resp->response_message = response;
             resp->fd = req->fd;
             resp->request_id = req->request_id;
-            resp->is_broadcast = true; 
-            resp->exclude_fd = req->fd;
+            resp->is_public = true;
+            resp->is_private = false;
+            resp->is_broadcast = false;  // No broadcast for now
+            resp->exclude_fd = -1;
             
             response_queue->push(resp);
         }
     }
 
     std::cout << "[PublicChatHandler] Stopped\n";
-};
+}

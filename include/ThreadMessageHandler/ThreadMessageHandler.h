@@ -18,6 +18,8 @@ struct HandlerResponse{
     int fd;
     int request_id;
     bool is_broadcast;
+    bool is_public;
+    bool is_private;
     int exclude_fd;
 };
 

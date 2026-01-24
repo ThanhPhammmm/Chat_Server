@@ -4,8 +4,14 @@
 #include "ThreadMessageHandler.h"
 #include "ThreadPool.h"
 #include "Epoll.h"
+#include <thread>
+#include <atomic>
+#include <iostream>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <cerrno>
 
-class Responser {
+class Responser{
     private:
         std::shared_ptr<MessageQueue<HandlerResponsePtr>> response_queue;
         ThreadPoolPtr thread_pool;
@@ -15,10 +21,11 @@ class Responser {
 
         void run();
         void sendToClient(HandlerResponsePtr resp);
-        //void broadcastMessage(HandlerResponsePtr resp);
 
     public:
-        Responser(std::shared_ptr<MessageQueue<HandlerResponsePtr>> resp_queue, ThreadPoolPtr pool, EpollPtr epoll);
+        Responser(std::shared_ptr<MessageQueue<HandlerResponsePtr>> resp_queue, 
+                  ThreadPoolPtr pool, 
+                  EpollPtr epoll);
         void start();
         void stop();
 };

@@ -15,6 +15,8 @@ class BaseThreadHandler{
         std::thread worker_thread;
         std::atomic<bool> running{false};
         std::string handler_name;
+        
+    protected:
         virtual void run() = 0;
 
     public:
@@ -23,6 +25,7 @@ class BaseThreadHandler{
                           std::shared_ptr<MessageQueue<HandlerResponsePtr>> response_queue,
                           const std::string& handler_name);
         virtual ~BaseThreadHandler();
+        
         void start();
         void stop();
 };

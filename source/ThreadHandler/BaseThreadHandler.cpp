@@ -1,5 +1,4 @@
 #include "BaseThreadHandler.h"
-#include "ThreadMessageHandler.h"
 
 BaseThreadHandler::BaseThreadHandler(MessageHandlerPtr message_handler,
                                      std::shared_ptr<MessageQueue<HandlerRequestPtr>> request_queue,
@@ -9,7 +8,7 @@ BaseThreadHandler::BaseThreadHandler(MessageHandlerPtr message_handler,
       request_queue(request_queue),
       response_queue(response_queue),
       handler_name(handler_name) {}
-      
+
 BaseThreadHandler::~BaseThreadHandler(){
     stop();
 }
@@ -40,10 +39,8 @@ void BaseThreadHandler::run(){
         
         auto req = req_opt.value();
         
-        // Process request
         std::string response = message_handler->handleMessage(req->connection, req->command);
         
-        // Send response back
         if(!response.empty()){
             auto resp = std::make_shared<HandlerResponse>();
             resp->connection = req->connection;
@@ -51,6 +48,8 @@ void BaseThreadHandler::run(){
             resp->fd = req->fd;
             resp->request_id = req->request_id;
             resp->is_broadcast = false;
+            resp->is_public = false;
+            resp->is_private = false;
             resp->exclude_fd = -1;
             
             response_queue->push(resp);
@@ -59,4 +58,3 @@ void BaseThreadHandler::run(){
 
     std::cout << "[" << handler_name << "] Stopped\n";
 }
-

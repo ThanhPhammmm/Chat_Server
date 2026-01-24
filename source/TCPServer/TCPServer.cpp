@@ -1,11 +1,4 @@
 #include "TCPServer.h"
-#include <arpa/inet.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/socket.h>
-#include <iostream>
-#include <cstring>
-#include <cerrno>
 
 static void setNonBlock(int fd){
     int flags = fcntl(fd, F_GETFL, 0);
@@ -18,12 +11,12 @@ static void setNonBlock(int fd){
     }
 }
 
-TCPServer::TCPServer(const sockaddr_in& addr, EpollInstance& epoll, ThreadPool& thread_pool)
+TCPServer::TCPServer(const sockaddr_in& addr, EpollPtr epoll, ThreadPoolPtr thread_pool)
     : epoll_instance(epoll), 
       thread_pool_instance(thread_pool){ 
     
     listen_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if(listen_fd < 0) {
+    if(listen_fd < 0){
         perror("socket");
         throw std::runtime_error("Failed to create socket");
     }
@@ -54,7 +47,7 @@ TCPServer::TCPServer(const sockaddr_in& addr, EpollInstance& epoll, ThreadPool& 
     
     setNonBlock(listen_fd);
     
-    std::cout<< "[INFO] Server listening on port "<< ntohs(addr.sin_port) << std::endl;
+    std::cout << "[INFO] Server listening on port " << ntohs(addr.sin_port) << std::endl;
 }
 
 TCPServer::~TCPServer(){
@@ -64,6 +57,11 @@ TCPServer::~TCPServer(){
 }
 
 void TCPServer::onRead(int clientFd){
+    ConnectionPtr conn = epoll_instance->getConnection(clientFd);
+    if(!conn || conn->isClosed()){
+        return;
+    }
+    
     while(true){
         char buf[4096];
         ssize_t n = recv(clientFd, buf, sizeof(buf), 0);
@@ -73,26 +71,35 @@ void TCPServer::onRead(int clientFd){
                 break;
             }
             perror("recv");
-            epoll_instance.removeFd(clientFd);
+            epoll_instance->removeFd(clientFd);
             return;
         }
         
         if(n == 0){
             std::cout << "[INFO] Client closed connection fd=" << clientFd << std::endl;
-            epoll_instance.removeFd(clientFd);
+            epoll_instance->removeFd(clientFd);
             return;
         }
         
         std::string msg(buf, n);
         
-        thread_pool_instance.submit([clientFd, msg](){
-            std::cout << "[Client " << clientFd << "]: " << msg << std::endl;
+        thread_pool_instance->submit([conn, msg](){
+            if(conn->isClosed()){
+                return;
+            }
+            
+            int fd = conn->getFd();
+            std::cout << "[Client " << fd << "]: " << msg << std::endl;
             
             const char* data = msg.data();
             size_t remaining = msg.size();
             
             while(remaining > 0){
-                ssize_t sent = send(clientFd, data, remaining, MSG_NOSIGNAL);
+                if(conn->isClosed()){
+                    break;
+                }
+                
+                ssize_t sent = send(fd, data, remaining, MSG_NOSIGNAL);
                 
                 if(sent < 0){
                     if(errno == EAGAIN || errno == EWOULDBLOCK){
@@ -127,24 +134,37 @@ void TCPServer::onAccept(int fd){
 
         char client_ip[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, sizeof(client_ip));
-        std::cout << "[INFO] New connection from " << client_ip << ":" << ntohs(client_addr.sin_port) << " fd=" << cfd << std::endl;
+        std::cout << "[INFO] New connection from " << client_ip 
+                  << ":" << ntohs(client_addr.sin_port) 
+                  << " fd=" << cfd << std::endl;
 
         setNonBlock(cfd);
 
-        epoll_instance.addFd(cfd, [this](int clientFd){
-            onRead(clientFd);
-        });
+        auto conn = std::make_shared<Connection>(cfd);
+        
+        std::weak_ptr<TCPServer> weak_this = shared_from_this();
+        
+        epoll_instance->addFd(cfd, [weak_this](int clientFd){
+            if(auto self = weak_this.lock()){
+                self->onRead(clientFd);
+            }
+        }, conn);
     }
 }
 
 void TCPServer::startServer(){
-    epoll_instance.addFd(listen_fd, [this](int fd){
-        onAccept(fd);
+    std::weak_ptr<TCPServer> weak_this = shared_from_this();
+    
+    epoll_instance->addFd(listen_fd, [weak_this](int fd){
+        if(auto self = weak_this.lock()){
+            self->onAccept(fd);
+        }
     });
+    
     std::cout << "[INFO] Server started successfully" << std::endl;
 }
 
 void TCPServer::stopServer(){
     std::cout << "[INFO] Stopping server..." << std::endl;
-    epoll_instance.stop();
+    epoll_instance->stop();
 }

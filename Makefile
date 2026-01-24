@@ -14,10 +14,10 @@ SERVER_SRCS = \
 	source/main.cpp \
 	source/TCPServer/TCPServer.cpp \
 	source/TCPSession/Epoll.cpp \
-	source/TCPSession/ThreadPool.cpp
+	source/TCPSession/ThreadPool.cpp \
+	source/TCPSession/Connection.cpp
 
-CLIENT_SRCS = \
-	source/Client/client.cpp
+CLIENT_SRCS = source/Client/client.cpp
 
 all: server client
 

@@ -65,7 +65,20 @@ void ChatControllerThread::routeMessage(const IncomingMessage& incoming, Command
     
     auto it = handler_queues.find(cmd->type);
     if(it == handler_queues.end()){
-        LOG_WARNING_STREAM("[Router] Unknown command type: " << static_cast<int>(cmd->type));        
+        LOG_WARNING_STREAM("[Router] Unknown command type: " << static_cast<int>(cmd->type) 
+                          << " from fd=" << incoming.fd);
+        
+        if(cmd->type == CommandType::UNKNOWN && incoming.connection && !incoming.connection->isClosed()){
+            std::string error_msg = "Error: Unknown command. Available commands:\n"
+                                   "  /all or /public_chat                              - Send public message\n"
+                                   "  /login <name>                                     - Login (not implemented)\n"
+                                   "  /logout                                           - Logout (not implemented)\n"
+                                   "  /list_users                                       - List users (not implemented)\n"
+                                   "  /msg <user> <msg>  or /private_chat              - Private message (not implemented)\n";
+            
+            int fd = incoming.fd;
+            send(fd, error_msg.c_str(), error_msg.size(), MSG_NOSIGNAL);
+        }
         return;
     }
     

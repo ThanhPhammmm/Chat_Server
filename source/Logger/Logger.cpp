@@ -73,6 +73,7 @@ void Logger::setLogFile(const std::string& filename){
     }
 
     if(log_file.is_open()){
+        log_file.flush();
         log_file.close();
     }
 
@@ -83,6 +84,8 @@ void Logger::setLogFile(const std::string& filename){
     } 
     else{
         file_output = true;
+        log_file << "\n========== New Session: " << getCurrentTime() << " ==========\n";
+        log_file.flush();
     }
 }
 

@@ -153,6 +153,9 @@ int main(){
         response_dispatcher->stop();
         LOG_INFO("✓ Response Dispatcher stopped");
         
+        server->stopServer();
+        LOG_INFO("✓ TCP Server stopped");
+
         LOG_INFO("Clean shutdown complete");
         
     } 

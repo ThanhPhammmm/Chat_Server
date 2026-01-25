@@ -26,35 +26,35 @@ void BaseThreadHandler::stop(){
     }
 }
 
-void BaseThreadHandler::run(){
-    std::cout << "┌────────────────────────────────────┐\n";
-    std::cout << "│ [" << handler_name << "] Started\n";
-    std::cout << "│ TID: " << std::this_thread::get_id() << "\n";
-    std::cout << "└────────────────────────────────────┘\n";
+// void BaseThreadHandler::run(){
+//     std::cout << "┌────────────────────────────────────┐\n";
+//     std::cout << "│ [" << handler_name << "] Started\n";
+//     std::cout << "│ TID: " << std::this_thread::get_id() << "\n";
+//     std::cout << "└────────────────────────────────────┘\n";
 
-    while(running.load()){
-        auto req_opt = request_queue->pop(100);
+//     while(running.load()){
+//         auto req_opt = request_queue->pop(100);
         
-        if(!req_opt.has_value()) continue;
+//         if(!req_opt.has_value()) continue;
         
-        auto req = req_opt.value();
+//         auto req = req_opt.value();
         
-        std::string response = message_handler->handleMessage(req->connection, req->command);
+//         std::string response = message_handler->handleMessage(req->connection, req->command);
         
-        if(!response.empty()){
-            auto resp = std::make_shared<HandlerResponse>();
-            resp->connection = req->connection;
-            resp->response_message = response;
-            resp->fd = req->fd;
-            resp->request_id = req->request_id;
-            resp->is_broadcast = false;
-            resp->is_public = false;
-            resp->is_private = false;
-            resp->exclude_fd = -1;
+//         if(!response.empty()){
+//             auto resp = std::make_shared<HandlerResponse>();
+//             resp->connection = req->connection;
+//             resp->response_message = response;
+//             resp->fd = req->fd;
+//             resp->request_id = req->request_id;
+//             resp->is_broadcast = false;
+//             resp->is_public = false;
+//             resp->is_private = false;
+//             resp->exclude_fd = -1;
             
-            response_queue->push(resp);
-        }
-    }
+//             response_queue->push(resp);
+//         }
+//     }
 
-    std::cout << "[" << handler_name << "] Stopped\n";
-}
+//     std::cout << "[" << handler_name << "] Stopped\n";
+// }

@@ -42,15 +42,19 @@ void Connection::close(){
     bool expected = false;
     if(closed.compare_exchange_strong(expected, true, std::memory_order_acq_rel)){
         if(fd >= 0){
-            std::cout << "[INFO] Closing connection fd=" << fd << std::endl;
-            
-            ::shutdown(fd, SHUT_RDWR);
-            
-            if(::close(fd) < 0){
-                perror("close");
+            int shutdown_result = ::shutdown(fd, SHUT_RDWR);
+            if(shutdown_result < 0 && errno != ENOTCONN){
+                std::cerr << "[WARNING] Shutdown error on fd=" << fd 
+                         << ": " << strerror(errno) << std::endl;
             }
             
+            int close_result = ::close(fd);
+            if(close_result < 0){
+                std::cerr << "[WARNING] Close error on fd=" << fd 
+                         << ": " << strerror(errno) << std::endl;
+            }
             fd = -1;
         }
     }
+    // If compare_exchange failed, another thread already closed it
 }

@@ -8,6 +8,8 @@
 #include <string>
 #include <chrono>
 
+#define BUFFER_SIZE 4096
+
 std::atomic<bool> running{true};
 
 void setNonBlocking(int fd){
@@ -21,11 +23,11 @@ void setBlocking(int fd){
 }
 
 void receiveThread(int sock){
-    char buffer[4096];
+    char buffer[BUFFER_SIZE];
     
     while(running.load()){
-        memset(buffer, 0, sizeof(buffer));
-        int n = recv(sock, buffer, sizeof(buffer) - 1, 0);
+        memset(buffer, 0, BUFFER_SIZE);
+        int n = recv(sock, buffer, BUFFER_SIZE - 1, 0);
         
         if(n < 0){
             if(errno == EAGAIN || errno == EWOULDBLOCK){
@@ -88,6 +90,7 @@ int main(){
     std::cout <<     "║  Type 'exit' to disconnect         ║\n";
     std::cout <<     "╚════════════════════════════════════╝\n\n";
 
+    setNonBlocking(sock);
     std::thread recv_thread(receiveThread, sock);
 
     std::string msg;
@@ -104,17 +107,34 @@ int main(){
         
         if(msg.empty()) continue;
         
-        ssize_t sent = send(sock, msg.c_str(), msg.size(), 0);
-        if(sent < 0){
-            perror("send");
-            running.store(false);
-            break;
+        size_t total_sent = 0;
+        size_t remaining = msg.size();
+        const char* data = msg.c_str();
+        
+        while(remaining > 0 && running.load()){
+            ssize_t sent = send(sock, data + total_sent, remaining, MSG_NOSIGNAL);
+            
+            if(sent < 0){
+                if(errno == EAGAIN || errno == EWOULDBLOCK){
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                    continue;
+                }
+                perror("send");
+                running.store(false);
+                break;
+            }
+            
+            total_sent += sent;
+            remaining -= sent;
         }
     }
 
     running.store(false);
     shutdown(sock, SHUT_RDWR);
-    recv_thread.join();
+
+    if(recv_thread.joinable()){
+        recv_thread.join();
+    }
     close(sock);
     
     std::cout << "\n╔════════════════════════════════════╗\n";

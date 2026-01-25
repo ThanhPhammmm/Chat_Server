@@ -49,15 +49,25 @@ void Responser::run(){
 }
 
 void Responser::sendToClient(HandlerResponsePtr resp){
+    if(!resp || !resp->connection){
+        LOG_WARNING("Attempted to send to null connection");
+        return;
+    }
     thread_pool->submit([conn = resp->connection, 
                         content = resp->response_message](){
-        if(conn->isClosed()) return;
-        
+        if(!conn || conn->isClosed()){
+            return;
+        }        
         int fd = conn->getFd();
+        if(fd < 0){
+            return;
+        }        
         const char* data = content.data();
         size_t remaining = content.size();
-        
-        while(remaining > 0){
+        int retry_count = 0;
+        const int MAX_RETRIES = 3;
+
+        while(remaining > 0 && retry_count < MAX_RETRIES){
             if(conn->isClosed()) break;
             
             ssize_t sent = send(fd, data, remaining, MSG_NOSIGNAL);
@@ -65,14 +75,33 @@ void Responser::sendToClient(HandlerResponsePtr resp){
             if(sent < 0){
                 if(errno == EAGAIN || errno == EWOULDBLOCK){
                     usleep(1000);
+                    retry_count++;
                     continue;
+                }
+                else if(errno == EPIPE || errno == ECONNRESET){
+                    LOG_DEBUG_STREAM("Connection closed during send (fd=" << fd << ")");
+                    break;
+                }
+                else{
+                    LOG_ERROR_STREAM("Send error (fd=" << fd << "): " << strerror(errno));
+                    break;
                 }
                 perror("send");
                 break;
             }
-            
-            data += sent;
-            remaining -= sent;
+            else if(sent == 0){
+                LOG_WARNING_STREAM("Send returned 0 (fd=" << fd << ")");
+                break;
+            }
+            else{
+                data += sent;
+                remaining -= sent;
+                retry_count = 0;
+            }
+        }
+        if(remaining > 0){
+            LOG_WARNING_STREAM("Failed to send complete message (fd=" << fd 
+                             << ", " << remaining << " bytes remaining)");
         }
     });
 }

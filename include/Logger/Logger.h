@@ -27,13 +27,17 @@ public:
     void setLogFile(const std::string& filename);
 
     void debug(const std::string& message,
-               const std::string& file = "", int line = 0);
+               const std::string& file = "", 
+               int line = 0);
     void info(const std::string& message,
-              const std::string& file = "", int line = 0);
+              const std::string& file = "", 
+              int line = 0);
     void warning(const std::string& message,
-                 const std::string& file = "", int line = 0);
+                 const std::string& file = "", 
+                 int line = 0);
     void error(const std::string& message,
-               const std::string& file = "", int line = 0);
+               const std::string& file = "", 
+               int line = 0);
 
 private:
     Logger();

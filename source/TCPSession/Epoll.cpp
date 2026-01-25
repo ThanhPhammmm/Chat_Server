@@ -1,4 +1,4 @@
-#include "Epoll.h"
+#include "TCPServer.h"
 
 EpollInstance::EpollInstance(){
     epfd = epoll_create1(0);
@@ -9,12 +9,26 @@ EpollInstance::EpollInstance(){
 }
 
 EpollInstance::~EpollInstance(){
+    stop();
+    
+    int wait_count = 0;
+    while(!should_stop.load() && wait_count++ < 10){
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    
     std::lock_guard<std::mutex> lock(handlers_mutex);
+    
+    for(auto& pair : connections){
+        if(pair.second){
+            pair.second->close();
+        }
+    }
     connections.clear();
     handlers.clear();
     
     if(epfd >= 0){
         close(epfd);
+        epfd = -1;
     }
 }
 
@@ -40,6 +54,7 @@ void EpollInstance::removeFd(int fd){
     epoll_ctl(epfd, EPOLL_CTL_DEL, fd, nullptr);
     
     ConnectionPtr conn;
+    Callback handler;
     {
         std::lock_guard<std::mutex> lock(handlers_mutex);
         handlers.erase(fd);
@@ -50,11 +65,10 @@ void EpollInstance::removeFd(int fd){
             connections.erase(it);
         }
     }
-    
-    if(conn){
+    if(conn && !conn->isClosed()){
         conn->close();
     }
-    std::cout << "[INFO] Closed connection fd=" << fd << std::endl;
+    LOG_INFO_STREAM("Client disconnected fd=" << fd);
 }
 
 ConnectionPtr EpollInstance::getConnection(int fd){
@@ -67,7 +81,7 @@ ConnectionPtr EpollInstance::getConnection(int fd){
 }
 
 void EpollInstance::run(){
-    epoll_event events[1024];
+    epoll_event events[MAX_EVENTS];
 
     while(!should_stop.load()){
         int n = epoll_wait(epfd, events, 1024, 1000);
@@ -83,7 +97,6 @@ void EpollInstance::run(){
             uint32_t ev = events[i].events;
             
             if(ev & (EPOLLERR | EPOLLHUP | EPOLLRDHUP)){
-                // std::cout << "[INFO] Connection error/closed fd=" << fd << std::endl;
                 removeFd(fd);
                 continue;
             }
@@ -96,7 +109,16 @@ void EpollInstance::run(){
                 handler = it->second;
             }
             
-            handler(fd);
+            if(handler){
+                try{
+                    handler(fd);
+                }
+                catch(const std::exception& e){
+                    std::cerr << "[ERROR] Handler exception for fd=" << fd 
+                             << ": " << e.what() << std::endl;
+                    removeFd(fd);
+                }
+            }
         }
     }
 }
@@ -112,8 +134,12 @@ bool EpollInstance::isStopped() const{
 std::vector<ConnectionPtr> EpollInstance::getAllConnections(){
     std::lock_guard<std::mutex> lock(handlers_mutex);
     std::vector<ConnectionPtr> conns;
+    conns.reserve(connections.size());
+
     for(const auto& pair : connections){
-        conns.push_back(pair.second);
+        if(pair.second && !pair.second->isClosed()){
+            conns.push_back(pair.second);
+        }
     }
     return conns;
 }

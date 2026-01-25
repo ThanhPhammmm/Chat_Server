@@ -66,44 +66,37 @@ void TCPServer::onRead(int clientFd){
     }
     
     while(true){
-        char buf[4096];
-        ssize_t n = recv(clientFd, buf, sizeof(buf), 0);
+        char buf[BUFFER_SIZE];
+        ssize_t n = recv(clientFd, buf, BUFFER_SIZE - 1, 0);
         
         if(n < 0){
             if(errno == EAGAIN || errno == EWOULDBLOCK){
                 break;
             }
             
-            perror("recv");
-            
-            // Message msg;
-            // msg.type = MessageType::CLIENT_DISCONNECTED;
-            // msg.payload = ClientDisconnected{clientFd};
-            // to_router_queue->push(std::move(msg));
-            
-            // epoll_instance->removeFd(clientFd);
+            LOG_WARNING_STREAM("Recv error on fd=" << clientFd << ": " << strerror(errno));
+            epoll_instance->removeFd(clientFd);
             return;
         }
         
         if(n == 0){
-            // std::cout << "[INFO] Client closed connection fd=" << clientFd << std::endl;
-            
-            // Message msg;
-            // msg.type = MessageType::CLIENT_DISCONNECTED;
-            // msg.payload = ClientDisconnected{clientFd};
-            // to_router_queue->push(std::move(msg));
-            
-            // epoll_instance->removeFd(clientFd);
+            LOG_INFO_STREAM("Client disconnected fd=" << clientFd);
+            epoll_instance->removeFd(clientFd);
             return;
         }
         
+        buf[n] = '\0';
         std::string content(buf, n);
-        
+        if(content.empty()){
+            continue;
+        }
+
         Message msg;
         msg.type = MessageType::INCOMING_MESSAGE;
         msg.payload = IncomingMessage{conn, content, clientFd};
         to_router_queue->push(std::move(msg));
-        
+
+        LOG_DEBUG_STREAM("[TCPServer] Received " << n << " bytes from fd=" << clientFd);
         LOG_DEBUG_STREAM("[TCPServer] Pushed message from fd=" << clientFd
                         << " to router queue");
     }
@@ -120,7 +113,7 @@ void TCPServer::onAccept(int fd){
             if(errno == EAGAIN || errno == EWOULDBLOCK){
                 break;
             }
-            perror("accept");
+            LOG_ERROR_STREAM("Accept error: " << strerror(errno));
             break;
         }
 
@@ -159,5 +152,10 @@ void TCPServer::startServer(){
 
 void TCPServer::stopServer(){
     LOG_INFO_STREAM("Stopping server...");
-    epoll_instance->stop();
+    if(listen_fd >= 0){
+        epoll_instance->removeFd(listen_fd);
+        close(listen_fd);
+        listen_fd = -1;
+    }
+    LOG_INFO_STREAM("Server stopped");
 }

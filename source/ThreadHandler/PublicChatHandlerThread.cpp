@@ -1,4 +1,5 @@
 #include "PublicChatHandlerThread.h"
+#include "TCPServer.h"
 
 PublicChatHandlerThread::PublicChatHandlerThread(std::shared_ptr<PublicChatHandler> handler,
                                                  std::shared_ptr<MessageQueue<HandlerRequestPtr>> req_queue,
@@ -7,10 +8,10 @@ PublicChatHandlerThread::PublicChatHandlerThread(std::shared_ptr<PublicChatHandl
       public_chat_handler(handler) {}
 
 void PublicChatHandlerThread::run(){
-    std::cout << "┌────────────────────────────────────┐\n";
-    std::cout << "│ [PublicChatHandler] Started\n";
-    std::cout << "│ TID: " << std::this_thread::get_id() << "\n";
-    std::cout << "└────────────────────────────────────┘\n";
+    LOG_INFO_STREAM("┌────────────────────────────────────┐");
+    LOG_INFO_STREAM("│ [PublicChatHandler] Started");
+    LOG_INFO_STREAM("│ TID: " << std::this_thread::get_id());
+    LOG_INFO_STREAM("└────────────────────────────────────┘");
 
     while(running.load()){
         auto req_opt = request_queue->pop(100);
@@ -36,5 +37,5 @@ void PublicChatHandlerThread::run(){
         }
     }
 
-    std::cout << "[PublicChatHandler] Stopped\n";
+    LOG_INFO_STREAM("[PublicChatHandler] Stopped");
 }

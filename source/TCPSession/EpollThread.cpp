@@ -1,5 +1,6 @@
 #include "EpollThread.h"
 #include "Epoll.h"
+#include "TCPServer.h"
 
 EpollThread::EpollThread(EpollPtr epoll) : epoll_instance(epoll) {}
 
@@ -17,14 +18,14 @@ void EpollThread::stop(){
 }
 
 void EpollThread::run(){
-    std::cout << "┌────────────────────────────────────┐\n";
-    std::cout << "│ [EpollThread] Started              │\n";
-    std::cout << "│ TID: " << std::this_thread::get_id() << "           │\n";
-    std::cout << "└────────────────────────────────────┘\n";
+    LOG_INFO_STREAM("┌────────────────────────────────────┐");
+    LOG_INFO_STREAM("│       [EpollThread] Started        │");
+    LOG_INFO_STREAM("│ TID: " << std::this_thread::get_id());
+    LOG_INFO_STREAM("└────────────────────────────────────┘");
     
     epoll_instance->run();
     
-    std::cout << "[EpollThread] Stopped\n";
+    LOG_INFO_STREAM("[EpollThread] Stopped");
 }
 
 EpollPtr EpollThread::getEpoll(){

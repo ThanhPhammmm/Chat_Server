@@ -51,8 +51,7 @@ TCPServer::TCPServer(const sockaddr_in& addr,
     
     setNonBlock(listen_fd);
     
-    std::cout << "[INFO] Server listening on port " << ntohs(addr.sin_port) << std::endl;
-}
+    LOG_INFO_STREAM("[INFO] Server listening on port " << ntohs(addr.sin_port));}
 
 TCPServer::~TCPServer(){
     if(listen_fd >= 0){
@@ -105,8 +104,8 @@ void TCPServer::onRead(int clientFd){
         msg.payload = IncomingMessage{conn, content, clientFd};
         to_router_queue->push(std::move(msg));
         
-        std::cout << "[TCPServer] Pushed message from fd=" << clientFd 
-                  << " to router queue\n";
+        LOG_DEBUG_STREAM("[TCPServer] Pushed message from fd=" << clientFd
+                        << " to router queue");
     }
 }
 
@@ -127,9 +126,10 @@ void TCPServer::onAccept(int fd){
 
         char client_ip[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, sizeof(client_ip));
-        std::cout << "[INFO] New connection from " << client_ip 
-                  << ":" << ntohs(client_addr.sin_port) 
-                  << " fd=" << cfd << std::endl;
+        LOG_INFO_STREAM("New connection from "
+                        << client_ip << ":"
+                        << ntohs(client_addr.sin_port)
+                        << " fd=" << cfd);
 
         setNonBlock(cfd);
 
@@ -154,10 +154,10 @@ void TCPServer::startServer(){
         }
     });
     
-    std::cout << "[INFO] Server started successfully" << std::endl;
+    LOG_INFO_STREAM("Server started successfully");
 }
 
 void TCPServer::stopServer(){
-    std::cout << "[INFO] Stopping server..." << std::endl;
+    LOG_INFO_STREAM("Stopping server...");
     epoll_instance->stop();
 }

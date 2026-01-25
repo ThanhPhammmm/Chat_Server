@@ -1,25 +1,11 @@
-#include <arpa/inet.h>
-#include <csignal>
-#include <iostream>
-#include <thread>
-#include <chrono>
-#include <memory>
-
 #include "TCPServer.h"
-#include "EpollThread.h"
-#include "ChatControllerThread.h"
-#include "PublicChatHandlerThread.h"
-#include "PublicChatHandler.h"
-#include "Responser.h"
-#include "MessageQueue.h"
-#include "Message.h"
-#include "ThreadMessageHandler.h"
+
 
 EpollPtr g_epoll = nullptr;
 std::shared_ptr<MessageQueue<Message>> g_incoming = nullptr;
 
 void signalHandler(int signum){
-    std::cout << "\n[INFO] Received signal " << signum << ", shutting down...\n";
+    LOG_INFO_STREAM("Received signal " << signum << ", shutting down...");
     
     if(g_epoll){
         g_epoll->stop();
@@ -37,42 +23,64 @@ int main(){
     signal(SIGTERM, signalHandler); 
     signal(SIGPIPE, SIG_IGN);
 
-    try{
-        std::cout << "╔════════════════════════════════════════════╗\n";
-        std::cout << "║   Multi-Threaded Chat Server               ║\n";
-        std::cout << "╚════════════════════════════════════════════╝\n";
-        std::cout << "Main Thread: " << std::this_thread::get_id() << "\n\n";
+    // Initialize Logger
+    auto& logger = Logger::getInstance();
+    logger.setLogLevel(LogLevel::INFO);
+    logger.setConsoleOutput(true);
+    logger.setFileOutput(true);
+    logger.setLogFile("Record/chat_server.log");
+    
+    LOG_INFO("╔════════════════════════════════════════════╗");
+    LOG_INFO("║   Multi-Threaded Chat Server               ║");
+    LOG_INFO("╚════════════════════════════════════════════╝");
+    LOG_INFO_STREAM("Main Thread: " << std::this_thread::get_id());
 
+    try{
         // 1. CREATE CORE COMPONENTS
+        LOG_DEBUG("Creating core components...");
         auto thread_pool = std::make_shared<ThreadPool>(4);
+        LOG_DEBUG("ThreadPool created with 4 workers");
+        
         auto epoll_instance = std::make_shared<EpollInstance>();
         g_epoll = epoll_instance;
+        LOG_DEBUG("EpollInstance created");
         
         // 2. CREATE MESSAGE QUEUES
+        LOG_DEBUG("Creating message queues...");
         auto incoming_queue = std::make_shared<MessageQueue<Message>>();
         g_incoming = incoming_queue;
         
         auto to_public_queue = std::make_shared<MessageQueue<HandlerRequestPtr>>();
         auto response_queue = std::make_shared<MessageQueue<HandlerResponsePtr>>();
+        LOG_DEBUG("Message queues created");
         
         // 3. CREATE HANDLERS
+        LOG_DEBUG("Creating message handlers...");
         auto public_handler = std::make_shared<PublicChatHandler>();
+        LOG_DEBUG("PublicChatHandler created");
         
         // 4. CREATE HANDLER THREADS
+        LOG_DEBUG("Creating handler threads...");
         auto public_thread = std::make_shared<PublicChatHandlerThread>(
             public_handler, to_public_queue, response_queue
         );
+        LOG_DEBUG("PublicChatHandlerThread created");
         
-        // 5. CREATE ROUTER THREAD        
+        // 5. CREATE ROUTER THREAD
+        LOG_DEBUG("Creating router thread...");
         auto router = std::make_shared<ChatControllerThread>(incoming_queue);
         router->registerHandlerQueue(CommandType::PUBLIC_CHAT, to_public_queue);
+        LOG_DEBUG("ChatControllerThread created and configured");
         
         // 6. CREATE RESPONSE DISPATCHER
+        LOG_DEBUG("Creating response dispatcher...");
         auto response_dispatcher = std::make_shared<Responser>(
             response_queue, thread_pool, epoll_instance
         );
+        LOG_DEBUG("Responser created");
         
-        // 7. CREATE TCP SERVER        
+        // 7. CREATE TCP SERVER
+        LOG_DEBUG("Creating TCP server...");
         sockaddr_in addr{};
         addr.sin_family = AF_INET;
         addr.sin_addr.s_addr = INADDR_ANY;
@@ -83,58 +91,73 @@ int main(){
         );
         
         server->startServer();
+        LOG_INFO("TCP Server started successfully");
         
-        // 8. START ALL THREADS        
-        std::cout << "Starting threads...\n\n";
+        // 8. START ALL THREADS
+        LOG_INFO("Starting worker threads...");
         
         public_thread->start();
-        std::cout << "✓ PublicChatHandler Thread started\n";
+        LOG_INFO("✓ PublicChatHandler Thread started");
         
         router->start();
-        std::cout << "✓ Router Thread started\n";
+        LOG_INFO("✓ Router Thread started");
         
         response_dispatcher->start();
-        std::cout << "✓ Response Dispatcher started\n";
+        LOG_INFO("✓ Response Dispatcher started");
         
         EpollThread epoll_thread(epoll_instance);
         epoll_thread.start();
-        std::cout << "✓ Epoll Thread started\n";
+        LOG_INFO("✓ Epoll Thread started");
         
-        std::cout << "\n╔════════════════════════════════════╗\n";
-        std::cout << "║   Server Ready on port 8080        ║\n";
-        std::cout << "║   <message> - public chat          ║\n";
-        std::cout << "║   Press Ctrl+C to stop             ║\n";
-        std::cout << "╚════════════════════════════════════╝\n\n";
+        LOG_INFO("╔════════════════════════════════════╗");
+        LOG_INFO("║   Server Ready on port 8080        ║");
+        LOG_INFO("║   <message> - public chat          ║");
+        LOG_INFO("║   Press Ctrl+C to stop             ║");
+        LOG_INFO("╚════════════════════════════════════╝");
         
-        // 9. MAIN THREAD: MONITORING        
+        // 9. MAIN THREAD: MONITORING
+        int monitor_count = 0;
         while(!g_epoll->isStopped()){
             std::this_thread::sleep_for(std::chrono::seconds(5));
             
-            std::cout << "[STATS] In:" << incoming_queue->size()
-                      << " Public:" << to_public_queue->size()
-                      << " Resp:" << response_queue->size() << "\n";
+            size_t in_size = incoming_queue->size();
+            size_t pub_size = to_public_queue->size();
+            size_t resp_size = response_queue->size();
+            
+            LOG_DEBUG_STREAM("[STATS #" << ++monitor_count << "] "
+                           << "Incoming:" << in_size << " "
+                           << "Public:" << pub_size << " "
+                           << "Response:" << resp_size);
+            
+            // Warning if queues are getting full
+            if(in_size > 50 || pub_size > 50 || resp_size > 50){
+                LOG_WARNING_STREAM("High queue usage detected - "
+                                 << "In:" << in_size << " "
+                                 << "Pub:" << pub_size << " "
+                                 << "Resp:" << resp_size);
+            }
         }
         
-        // 10. GRACEFUL SHUTDOWN        
-        std::cout << "\n[INFO] Shutting down threads...\n";
+        // 10. GRACEFUL SHUTDOWN
+        LOG_INFO("Initiating graceful shutdown...");
         
         epoll_thread.stop();
-        std::cout << "✓ Epoll stopped\n";
+        LOG_INFO("✓ Epoll stopped");
         
         router->stop();
-        std::cout << "✓ Router stopped\n";
+        LOG_INFO("✓ Router stopped");
         
         public_thread->stop();
-        std::cout << "✓ PublicChatHandler stopped\n";
+        LOG_INFO("✓ PublicChatHandler stopped");
 
         response_dispatcher->stop();
-        std::cout << "✓ Response Dispatcher stopped\n";
+        LOG_INFO("✓ Response Dispatcher stopped");
         
-        std::cout << "\n[INFO] Clean shutdown complete\n";
+        LOG_INFO("Clean shutdown complete");
         
     } 
     catch(const std::exception& e){
-        std::cerr << "[ERROR] " << e.what() << std::endl;
+        LOG_ERROR_STREAM("Fatal error: " << e.what());
         return 1;
     }
     

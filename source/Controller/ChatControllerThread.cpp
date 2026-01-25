@@ -1,4 +1,5 @@
 #include "ChatControllerThread.h"
+#include "TCPServer.h"
 
 ChatControllerThread::ChatControllerThread(std::shared_ptr<MessageQueue<Message>> incoming_queue)
     : incoming_queue(incoming_queue) {}
@@ -24,10 +25,10 @@ void ChatControllerThread::stop(){
 }
 
 void ChatControllerThread::run(){
-    std::cout << "┌────────────────────────────────────┐\n";
-    std::cout << "│ [ChatControllerThread] Started\n";
-    std::cout << "│ TID: " << std::this_thread::get_id() << "\n";
-    std::cout << "└────────────────────────────────────┘\n";
+        LOG_INFO_STREAM("┌────────────────────────────────────┐");
+        LOG_INFO_STREAM("│   [ChatControllerThread] Started   │");
+        LOG_INFO_STREAM("│ TID: " << std::this_thread::get_id());
+        LOG_INFO_STREAM("└────────────────────────────────────┘");
 
     CommandParser parser;
 
@@ -56,8 +57,7 @@ void ChatControllerThread::run(){
         }
     }
 
-    std::cout << "[ChatControllerThread] Stopped\n";
-}
+    LOG_INFO_STREAM("[ChatControllerThread] Stopped");}
 
 void ChatControllerThread::routeMessage(const IncomingMessage& incoming, CommandParser& parser){
     std::string content = incoming.content;
@@ -65,7 +65,7 @@ void ChatControllerThread::routeMessage(const IncomingMessage& incoming, Command
     
     auto it = handler_queues.find(cmd->type);
     if(it == handler_queues.end()){
-        std::cout << "[Router] Unknown command type: " << (int)cmd->type << "\n";
+        LOG_WARNING_STREAM("[Router] Unknown command type: " << static_cast<int>(cmd->type));        
         return;
     }
     
@@ -77,8 +77,10 @@ void ChatControllerThread::routeMessage(const IncomingMessage& incoming, Command
     
     it->second->push(req);
     
-    std::cout << "[Router] Routed request #" << req->request_id 
-                << " to handler for type " << (int)cmd->type << "\n";
+    LOG_DEBUG_STREAM("[Router] Routed request #"
+                    << req->request_id
+                    << " to handler for type "
+                    << static_cast<int>(cmd->type));
 }
 
 // void ChatControllerThread::handleDisconnect(const ClientDisconnected& disc){

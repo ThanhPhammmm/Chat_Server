@@ -1,4 +1,5 @@
 #include "Responser.h"
+#include "TCPServer.h"
 
 Responser::Responser(std::shared_ptr<MessageQueue<HandlerResponsePtr>> resp_queue,
                      ThreadPoolPtr pool,
@@ -21,10 +22,10 @@ void Responser::stop(){
 }
 
 void Responser::run(){
-    std::cout << "┌────────────────────────────────────┐\n";
-    std::cout << "│ [ResponseDispatcher] Started       │\n";
-    std::cout << "│ TID: " << std::this_thread::get_id() << "           │\n";
-    std::cout << "└────────────────────────────────────┘\n";
+    LOG_INFO_STREAM("┌────────────────────────────────────┐");
+    LOG_INFO_STREAM("│    [ResponseDispatcher] Started    │");
+    LOG_INFO_STREAM("│ TID: " << std::this_thread::get_id());
+    LOG_INFO_STREAM("└────────────────────────────────────┘");
 
     while(running.load()){
         auto resp_opt = response_queue->pop(100);
@@ -44,7 +45,7 @@ void Responser::run(){
         }
     }
 
-    std::cout << "[ResponseDispatcher] Stopped\n";
+    LOG_INFO_STREAM("[ResponseDispatcher] Stopped");
 }
 
 void Responser::sendToClient(HandlerResponsePtr resp){

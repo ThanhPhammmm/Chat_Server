@@ -7,12 +7,14 @@ INCLUDES = \
 	-Iinclude/MessageHandler \
 	-Iinclude/Controller \
 	-Iinclude/ThreadHandler \
-	-Iinclude/ThreadMessageHandler
+	-Iinclude/ThreadMessageHandler \
+	-Iinclude/Logger
 
 RUN_DIR = RunProgram
 
 SERVER_TARGET = $(RUN_DIR)/chat_server
 CLIENT_TARGET = $(RUN_DIR)/chat_client
+LOGGER_TARGET = $(RUN_DIR)/Record
 
 SERVER_SRCS = \
 	source/main.cpp \
@@ -22,6 +24,7 @@ SERVER_SRCS = \
 	source/Controller/*.cpp \
 	source/MessageHandler/*.cpp \
 	source/ThreadHandler/*.cpp \
+	source/Logger/*.cpp
 
 CLIENT_SRCS = source/Client/client.cpp
 
@@ -42,5 +45,5 @@ run-client: client
 	./$(CLIENT_TARGET)
 
 clean:
-	rm -f $(SERVER_TARGET) $(CLIENT_TARGET)
+	rm -rf $(SERVER_TARGET) $(CLIENT_TARGET) $(LOGGER_TARGET)
 

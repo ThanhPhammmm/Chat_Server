@@ -21,6 +21,7 @@ struct HandlerResponse{
     bool is_public;
     bool is_private;
     int exclude_fd;
+    bool is_list_users;
 };
 
 using HandlerRequestPtr = std::shared_ptr<HandlerRequest>;

@@ -4,7 +4,7 @@ bool PublicChatHandler::canHandle(CommandType type){
     return type == CommandType::PUBLIC_CHAT;
 }
 
-std::string PublicChatHandler::handleMessage(ConnectionPtr conn, CommandPtr command){
+std::string PublicChatHandler::handleMessage(ConnectionPtr conn, CommandPtr command, EpollPtr epoll_instance){
     if(command->args.empty()){
         return "Error: No message provided for public chat.";
     }

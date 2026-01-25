@@ -1,0 +1,42 @@
+#include "ListUsersHandlerThread.h"
+
+ListUsersHandlerThread::ListUsersHandlerThread(std::shared_ptr<ListUsersHandler> handler,
+                                               std::shared_ptr<MessageQueue<HandlerRequestPtr>> req_queue,
+                                               std::shared_ptr<MessageQueue<HandlerResponsePtr>> resp_queue,
+                                               std::shared_ptr<EpollInstance> epoll_instance)
+    : BaseThreadHandler(handler, req_queue, resp_queue, "ListUsersHandler"),
+      list_users_handler(handler),
+      epoll_instance(epoll_instance) {}
+
+void ListUsersHandlerThread::run(){
+    LOG_INFO_STREAM("┌────────────────────────────────────┐");
+    LOG_INFO_STREAM("│   [ListUsersHandler] Started       │");
+    LOG_INFO_STREAM("│ TID: " << std::this_thread::get_id());
+    LOG_INFO_STREAM("└────────────────────────────────────┘");  
+
+    while(running.load()){
+        auto req_opt = request_queue->pop(100);
+        
+        if(!req_opt.has_value()) continue;
+        
+        auto req = req_opt.value();
+        
+        std::string response = list_users_handler->handleMessage(req->connection, req->command, epoll_instance);
+        
+        if(!response.empty()){
+            auto resp = std::make_shared<HandlerResponse>();
+            resp->connection = req->connection;
+            resp->response_message = response;
+            resp->fd = req->fd;
+            resp->request_id = req->request_id;
+            resp->is_public = false;
+            resp->is_private = false;
+            resp->is_broadcast = false;  // No broadcast for now
+            resp->is_list_users = true;
+            resp->exclude_fd = -1;
+            
+            response_queue->push(resp);
+        }
+    }
+    LOG_INFO_STREAM("[ListUsersHandler] Stopped");
+}

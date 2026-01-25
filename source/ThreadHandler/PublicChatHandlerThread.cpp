@@ -1,5 +1,4 @@
 #include "PublicChatHandlerThread.h"
-#include "TCPServer.h"
 
 PublicChatHandlerThread::PublicChatHandlerThread(std::shared_ptr<PublicChatHandler> handler,
                                                  std::shared_ptr<MessageQueue<HandlerRequestPtr>> req_queue,
@@ -31,6 +30,7 @@ void PublicChatHandlerThread::run(){
             resp->is_public = true;
             resp->is_private = false;
             resp->is_broadcast = false;  // No broadcast for now
+            resp->is_list_users = false;
             resp->exclude_fd = -1;
             
             response_queue->push(resp);

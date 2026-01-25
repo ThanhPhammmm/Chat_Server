@@ -1,6 +1,5 @@
 #include "TCPServer.h"
 
-
 EpollPtr g_epoll = nullptr;
 std::shared_ptr<MessageQueue<Message>> g_incoming = nullptr;
 
@@ -51,6 +50,8 @@ int main(){
         g_incoming = incoming_queue;
         
         auto to_public_queue = std::make_shared<MessageQueue<HandlerRequestPtr>>();
+        auto to_list_users_queue = std::make_shared<MessageQueue<HandlerRequestPtr>>();
+        
         auto response_queue = std::make_shared<MessageQueue<HandlerResponsePtr>>();
         LOG_DEBUG("Message queues created");
         
@@ -59,6 +60,10 @@ int main(){
         auto public_handler = std::make_shared<PublicChatHandler>();
         LOG_DEBUG("PublicChatHandler created");
         
+        LOG_DEBUG("Creating ListUsersHandler...");
+        auto list_users_handler = std::make_shared<ListUsersHandler>();
+        LOG_DEBUG("ListUsersHandler created");
+
         // 4. CREATE HANDLER THREADS
         LOG_DEBUG("Creating handler threads...");
         auto public_thread = std::make_shared<PublicChatHandlerThread>(
@@ -66,17 +71,22 @@ int main(){
         );
         LOG_DEBUG("PublicChatHandlerThread created");
         
+        LOG_DEBUG("Creating ListUsersHandlerThread...");
+        auto list_users_thread = std::make_shared<ListUsersHandlerThread>(
+            list_users_handler, to_list_users_queue, response_queue, epoll_instance
+        );
+        LOG_DEBUG("ListUsersHandlerThread created");
+
         // 5. CREATE ROUTER THREAD
         LOG_DEBUG("Creating router thread...");
         auto router = std::make_shared<ChatControllerThread>(incoming_queue);
         router->registerHandlerQueue(CommandType::PUBLIC_CHAT, to_public_queue);
+        router->registerHandlerQueue(CommandType::LIST_USERS, to_list_users_queue);
         LOG_DEBUG("ChatControllerThread created and configured");
         
         // 6. CREATE RESPONSE DISPATCHER
         LOG_DEBUG("Creating response dispatcher...");
-        auto response_dispatcher = std::make_shared<Responser>(
-            response_queue, thread_pool, epoll_instance
-        );
+        auto response_dispatcher = std::make_shared<Responser>(response_queue, thread_pool, epoll_instance);
         LOG_DEBUG("Responser created");
         
         // 7. CREATE TCP SERVER
@@ -99,6 +109,9 @@ int main(){
         public_thread->start();
         LOG_INFO("✓ PublicChatHandler Thread started");
         
+        list_users_thread->start();
+        LOG_INFO("✓ ListUsersHandler Thread started");
+
         router->start();
         LOG_INFO("✓ Router Thread started");
         
@@ -149,6 +162,9 @@ int main(){
         
         public_thread->stop();
         LOG_INFO("✓ PublicChatHandler stopped");
+
+        list_users_thread->stop();
+        LOG_INFO("✓ ListUsersHandler stopped");
 
         response_dispatcher->stop();
         LOG_INFO("✓ Response Dispatcher stopped");

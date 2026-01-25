@@ -30,11 +30,11 @@ Connection& Connection::operator=(Connection&& other) noexcept{
     return *this;
 }
 
-int Connection::getFd() const{
+int Connection::getFd(){
     return fd;
 }
 
-bool Connection::isClosed() const{
+bool Connection::isClosed(){
     return closed.load(std::memory_order_acquire);
 }
 

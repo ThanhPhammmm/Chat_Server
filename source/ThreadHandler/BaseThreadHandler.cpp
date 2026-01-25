@@ -19,12 +19,21 @@ void BaseThreadHandler::start(){
 }
 
 void BaseThreadHandler::stop(){
-    running.store(false);
-    request_queue->stop();
-    if(worker_thread.joinable()){
+    bool expected = true;
+    if(!running.compare_exchange_strong(expected, false)){
+        return;
+    }
+
+    if(request_queue){
+        request_queue->stop();
+    }
+
+    if(worker_thread.joinable() &&
+        std::this_thread::get_id() != worker_thread.get_id()){
         worker_thread.join();
     }
 }
+
 
 // void BaseThreadHandler::run(){
 //     std::cout << "┌────────────────────────────────────┐\n";

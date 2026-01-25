@@ -2,6 +2,10 @@
 
 #include "BaseThreadHandler.h"
 #include "PublicChatHandler.h"
+#include "ThreadMessageHandler.h"
+#include "MessageQueue.h"
+#include "Epoll.h"
+#include "Logger.h"
 
 class PublicChatHandlerThread : public BaseThreadHandler{
     private:

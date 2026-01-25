@@ -31,8 +31,8 @@ struct OutgoingResponse{
 // };
 
 using MessagePayload = std::variant<
-    IncomingMessage,
-    OutgoingResponse
+    IncomingMessage
+    // OutgoingResponse
     // BroadcastMessage,
     // ClientDisconnected
 >;

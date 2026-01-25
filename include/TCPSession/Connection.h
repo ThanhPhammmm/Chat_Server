@@ -36,8 +36,8 @@ public:
     Connection(Connection&& other) noexcept;
     Connection& operator=(Connection&& other) noexcept;
 
-    int getFd() const;
-    bool isClosed() const;
+    int getFd();
+    bool isClosed();
     void close();
 };
 

@@ -1,11 +1,11 @@
 #pragma once
 
-#include "MessageQueue.h"
-#include "ThreadMessageHandler.h"
 #include "MessageHandler.h"
+#include "ThreadMessageHandler.h"
+#include "MessageQueue.h"
 #include <thread>
 #include <atomic>
-#include <memory>
+#include <string>
 
 class BaseThreadHandler{
     protected:

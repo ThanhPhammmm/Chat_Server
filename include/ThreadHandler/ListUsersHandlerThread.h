@@ -12,7 +12,7 @@ class ListUsersHandlerThread : public BaseThreadHandler{
         std::shared_ptr<ListUsersHandler> list_users_handler;
         std::shared_ptr<EpollInstance> epoll_instance;
     protected:
-        void run();
+        void run() override;
 
     public:
         ListUsersHandlerThread(std::shared_ptr<ListUsersHandler> handler,

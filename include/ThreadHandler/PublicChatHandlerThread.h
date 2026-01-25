@@ -11,7 +11,7 @@ class PublicChatHandlerThread : public BaseThreadHandler{
     private:
         std::shared_ptr<PublicChatHandler> public_chat_handler;
         
-    // protected:
+    protected:
         void run();
         
     public:

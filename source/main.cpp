@@ -31,7 +31,7 @@ int main(){
     logger.setLogFile("Record/chat_server.log");
     
     LOG_INFO("╔════════════════════════════════════════════╗");
-    LOG_INFO("║   Multi-Threaded Chat Server               ║");
+    LOG_INFO("║          Multi-Threaded Chat Server        ║");
     LOG_INFO("╚════════════════════════════════════════════╝");
     LOG_INFO_STREAM("Main Thread: " << std::this_thread::get_id());
 

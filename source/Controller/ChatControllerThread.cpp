@@ -33,15 +33,23 @@ void ChatControllerThread::run(){
     CommandParser parser;
 
     while(running.load()){
-        auto msg_opt = incoming_queue->pop(100);
+        auto msg_opt = incoming_queue->pop(10);
         
         if(!msg_opt.has_value()) continue;
         
+        if(!msg_opt.has_value()){
+            if(!running.load()){
+                break;
+            }
+            continue;
+        }
+
         auto msg = msg_opt.value();
-        
         switch(msg.type){
             case MessageType::INCOMING_MESSAGE:
-                routeMessage(std::get<IncomingMessage>(msg.payload), parser);
+                if(running.load()){
+                    routeMessage(std::get<IncomingMessage>(msg.payload), parser);
+                }
                 break;
                 
             // case MessageType::CLIENT_DISCONNECTED:

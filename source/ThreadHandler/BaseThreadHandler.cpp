@@ -20,17 +20,21 @@ void BaseThreadHandler::start(){
 
 void BaseThreadHandler::stop(){
     bool expected = true;
-    if(!running.compare_exchange_strong(expected, false)){
+    if(!running.compare_exchange_strong(expected, false, std::memory_order_acq_rel)){
         return;
     }
-
+    
     if(request_queue){
         request_queue->stop();
     }
-
-    if(worker_thread.joinable() &&
-        std::this_thread::get_id() != worker_thread.get_id()){
-        worker_thread.join();
+    
+    if(worker_thread.joinable()){
+        if(std::this_thread::get_id() != worker_thread.get_id()){
+            worker_thread.join();
+        } 
+        else{
+            worker_thread.detach();
+        }
     }
 }
 

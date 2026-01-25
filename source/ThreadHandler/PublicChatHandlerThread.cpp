@@ -13,10 +13,14 @@ void PublicChatHandlerThread::run(){
     LOG_INFO_STREAM("└────────────────────────────────────┘");
 
     while(running.load()){
-        auto req_opt = request_queue->pop(100);
+        auto req_opt = request_queue->pop(10);
         
-        if(!req_opt.has_value()) continue;
-        
+        if(!req_opt.has_value()){
+            if(!running.load()){
+                break;
+            }
+            continue;
+        }        
         auto req = req_opt.value();
         
         std::string response = public_chat_handler->handleMessage(req->connection, req->command);
@@ -33,7 +37,9 @@ void PublicChatHandlerThread::run(){
             resp->is_list_users = false;
             resp->exclude_fd = -1;
             
-            response_queue->push(resp);
+            if(running.load()){
+                response_queue->push(resp);
+            }
         }
     }
 

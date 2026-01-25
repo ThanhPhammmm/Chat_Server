@@ -12,8 +12,13 @@ EpollInstance::~EpollInstance(){
     stop();
     
     int wait_count = 0;
-    while(!should_stop.load() && wait_count++ < 10){
+    const int MAX_WAIT = 50;
+    while(!should_stop.load(std::memory_order_acquire) && wait_count++ < MAX_WAIT){
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    
+    if(wait_count >= MAX_WAIT){
+        std::cerr << "[WARNING] EpollInstance destructor timeout waiting for run() to finish" << std::endl;
     }
     
     std::lock_guard<std::mutex> lock(handlers_mutex);
@@ -33,6 +38,11 @@ EpollInstance::~EpollInstance(){
 }
 
 void EpollInstance::addFd(int fd, Callback cb, ConnectionPtr conn){
+    if(should_stop.load(std::memory_order_acquire)){
+        std::cerr << "[WARNING] Attempted to add fd to stopped EpollInstance" << std::endl;
+        return;
+    }
+
     epoll_event ev{};
     ev.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
     ev.data.fd = fd;
@@ -54,7 +64,6 @@ void EpollInstance::removeFd(int fd){
     epoll_ctl(epfd, EPOLL_CTL_DEL, fd, nullptr);
     
     ConnectionPtr conn;
-    Callback handler;
     {
         std::lock_guard<std::mutex> lock(handlers_mutex);
         handlers.erase(fd);
@@ -93,6 +102,8 @@ void EpollInstance::run(){
         }
         
         for(int i = 0; i < n; i++){
+            if(should_stop.load(std::memory_order_acquire)) break;
+
             int fd = events[i].data.fd;
             uint32_t ev = events[i].events;
             
@@ -118,17 +129,22 @@ void EpollInstance::run(){
                              << ": " << e.what() << std::endl;
                     removeFd(fd);
                 }
+                catch(...){
+                    std::cerr << "[ERROR] Unknown handler exception for fd=" << fd << std::endl;
+                    removeFd(fd);
+                }
             }
         }
     }
+    LOG_INFO_STREAM("[EpollInstance] Run loop exited");
 }
 
 void EpollInstance::stop(){
-    should_stop.store(true);
+    should_stop.store(true, std::memory_order_release);
 }
 
 bool EpollInstance::isStopped() const{
-    return should_stop.load();
+    return should_stop.load(std::memory_order_acquire);
 }
 
 std::vector<ConnectionPtr> EpollInstance::getAllConnections(){

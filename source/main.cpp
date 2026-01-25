@@ -2,9 +2,10 @@
 
 EpollPtr g_epoll = nullptr;
 std::shared_ptr<MessageQueue<Message>> g_incoming = nullptr;
+std::atomic<bool> g_shutdown_requested{false};
 
 void signalHandler(int signum){
-    LOG_INFO_STREAM("Received signal " << signum << ", shutting down...");
+    g_shutdown_requested.store(true, std::memory_order_release);
     
     if(g_epoll){
         g_epoll->stop();
@@ -107,20 +108,20 @@ int main(){
         LOG_INFO("Starting worker threads...");
         
         public_thread->start();
-        LOG_INFO("✓ PublicChatHandler Thread started");
+        LOG_INFO("PublicChatHandler Thread started");
         
         list_users_thread->start();
-        LOG_INFO("✓ ListUsersHandler Thread started");
+        LOG_INFO("ListUsersHandler Thread started");
 
         router->start();
-        LOG_INFO("✓ Router Thread started");
+        LOG_INFO("Router Thread started");
         
         response_dispatcher->start();
-        LOG_INFO("✓ Response Dispatcher started");
+        LOG_INFO("Response Dispatcher started");
         
         EpollThread epoll_thread(epoll_instance);
         epoll_thread.start();
-        LOG_INFO("✓ Epoll Thread started");
+        LOG_INFO("Epoll Thread started");
         
         LOG_INFO("╔════════════════════════════════════╗");
         LOG_INFO("║   Server Ready on port 8080        ║");
@@ -130,7 +131,7 @@ int main(){
         
         // 9. MAIN THREAD: MONITORING
         int monitor_count = 0;
-        while(!g_epoll->isStopped()){
+        while(!g_epoll->isStopped() && !g_shutdown_requested.load()){
             std::this_thread::sleep_for(std::chrono::seconds(5));
             
             size_t in_size = incoming_queue->size();
@@ -155,22 +156,22 @@ int main(){
         LOG_INFO("Initiating graceful shutdown...");
         
         epoll_thread.stop();
-        LOG_INFO("✓ Epoll stopped");
+        LOG_INFO("Epoll stopped");
         
         router->stop();
-        LOG_INFO("✓ Router stopped");
+        LOG_INFO("Router stopped");
         
         public_thread->stop();
-        LOG_INFO("✓ PublicChatHandler stopped");
+        LOG_INFO("PublicChatHandler stopped");
 
         list_users_thread->stop();
-        LOG_INFO("✓ ListUsersHandler stopped");
+        LOG_INFO("ListUsersHandler stopped");
 
         response_dispatcher->stop();
-        LOG_INFO("✓ Response Dispatcher stopped");
+        LOG_INFO("Response Dispatcher stopped");
         
         server->stopServer();
-        LOG_INFO("✓ TCP Server stopped");
+        LOG_INFO("TCP Server stopped");
 
         LOG_INFO("Clean shutdown complete");
         

@@ -28,12 +28,18 @@ void Responser::run(){
     LOG_INFO_STREAM("└────────────────────────────────────┘");
 
     while(running.load()){
-        auto resp_opt = response_queue->pop(100);
+        auto resp_opt = response_queue->pop(10);
         
         if(!resp_opt.has_value()) continue;
         
-        auto resp = resp_opt.value();
+        if(!resp_opt.has_value()){
+            if(!running.load()){
+                break;
+            }
+            continue;
+        }
         
+        auto resp = resp_opt.value();
         if(resp->is_broadcast){
             //broadcastMessage(resp);
         } 

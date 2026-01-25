@@ -15,10 +15,15 @@ void ListUsersHandlerThread::run(){
     LOG_INFO_STREAM("└────────────────────────────────────┘");  
 
     while(running.load()){
-        auto req_opt = request_queue->pop(100);
+        auto req_opt = request_queue->pop(10);
         
-        if(!req_opt.has_value()) continue;
-        
+        if(!req_opt.has_value()){
+            if(!running.load()){
+                break;
+            }
+            continue;
+        }
+
         auto req = req_opt.value();
         
         std::string response = list_users_handler->handleMessage(req->connection, req->command, epoll_instance);
@@ -35,7 +40,9 @@ void ListUsersHandlerThread::run(){
             resp->is_list_users = true;
             resp->exclude_fd = -1;
             
-            response_queue->push(resp);
+            if(running.load()){
+                response_queue->push(resp);
+            }
         }
     }
     LOG_INFO_STREAM("[ListUsersHandler] Stopped");

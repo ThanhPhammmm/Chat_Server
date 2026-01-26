@@ -1,10 +1,19 @@
 #include "PublicChatHandler.h"
+#include "PublicChatRoom.h"
 
 bool PublicChatHandler::canHandle(CommandType type){
     return type == CommandType::PUBLIC_CHAT;
 }
 
-std::string PublicChatHandler::handleMessage(ConnectionPtr conn, CommandPtr command, EpollPtr epoll_instance){
+std::string PublicChatHandler::handleMessage(ConnectionPtr conn, CommandPtr command, EpollInstancePtr epoll_instance){
+    int fd = conn->getFd();
+    PublicChatRoom tmp;
+    auto& room = tmp.getInstance();
+    
+    if(!room.isParticipant(fd)){
+        return "Error: You must join public chat room first. Use /join_public_chat";
+    }
+
     if(command->args.empty()){
         return "Error: No message provided for public chat.";
     }

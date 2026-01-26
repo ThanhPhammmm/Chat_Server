@@ -14,6 +14,8 @@ enum class CommandType{
     PUBLIC_CHAT,
     PRIVATE_CHAT,
     LIST_USERS,
+    JOIN_PUBLIC_CHAT_ROOM,
+    LEAVE_PUBLIC_CHAT_ROOM,
     UNKNOWN
 };
 

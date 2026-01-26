@@ -3,9 +3,9 @@
 #include "Connection.h"
 
 enum class MessageType {
-    INCOMING_MESSAGE,    // Client → Server
-    // OUTGOING_RESPONSE,   // Server → Client
-    // BROADCAST,           // Server → All Clients
+    INCOMING_MESSAGE,    // Client -> Server
+    // OUTGOING_RESPONSE,   // Server -> Client
+    // BROADCAST,           // Server -> All Clients
     // CLIENT_DISCONNECTED,
     SHUTDOWN
 };

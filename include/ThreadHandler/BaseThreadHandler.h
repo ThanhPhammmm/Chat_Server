@@ -1,7 +1,7 @@
 #pragma once
 
 #include "MessageHandler.h"
-#include "ThreadMessageHandler.h"
+#include "MessageThreadHandler.h"
 #include "MessageQueue.h"
 #include <thread>
 #include <atomic>

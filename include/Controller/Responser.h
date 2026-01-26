@@ -1,7 +1,7 @@
 #pragma once
 
 #include "MessageQueue.h"
-#include "ThreadMessageHandler.h"
+#include "MessageThreadHandler.h"
 #include "ThreadPool.h"
 #include "Epoll.h"
 #include <thread>
@@ -15,17 +15,18 @@ class Responser{
     private:
         std::shared_ptr<MessageQueue<HandlerResponsePtr>> response_queue;
         ThreadPoolPtr thread_pool;
-        EpollPtr epoll_instance;
+        EpollInstancePtr epoll_instance;
         std::thread worker_thread;
         std::atomic<bool> running{false};
 
         void run();
         void sendToClient(HandlerResponsePtr resp);
+        void broadcastToRoom(HandlerResponsePtr resp);
 
     public:
         Responser(std::shared_ptr<MessageQueue<HandlerResponsePtr>> resp_queue, 
                   ThreadPoolPtr pool, 
-                  EpollPtr epoll);
+                  EpollInstancePtr epoll);
         void start();
         void stop();
 };

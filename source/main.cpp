@@ -1,6 +1,6 @@
 #include "TCPServer.h"
 
-EpollPtr g_epoll = nullptr;
+EpollInstancePtr g_epoll = nullptr;
 std::shared_ptr<MessageQueue<Message>> g_incoming = nullptr;
 std::atomic<bool> g_shutdown_requested{false};
 
@@ -52,7 +52,8 @@ int main(){
         
         auto to_public_queue = std::make_shared<MessageQueue<HandlerRequestPtr>>();
         auto to_list_users_queue = std::make_shared<MessageQueue<HandlerRequestPtr>>();
-        
+        auto to_join_queue = std::make_shared<MessageQueue<HandlerRequestPtr>>();
+        auto to_leave_queue = std::make_shared<MessageQueue<HandlerRequestPtr>>();
         auto response_queue = std::make_shared<MessageQueue<HandlerResponsePtr>>();
         LOG_DEBUG("Message queues created");
         
@@ -65,24 +66,37 @@ int main(){
         auto list_users_handler = std::make_shared<ListUsersHandler>();
         LOG_DEBUG("ListUsersHandler created");
 
-        // 4. CREATE HANDLER THREADS
-        LOG_DEBUG("Creating handler threads...");
-        auto public_thread = std::make_shared<PublicChatHandlerThread>(
-            public_handler, to_public_queue, response_queue
-        );
-        LOG_DEBUG("PublicChatHandlerThread created");
-        
-        LOG_DEBUG("Creating ListUsersHandlerThread...");
-        auto list_users_thread = std::make_shared<ListUsersHandlerThread>(
-            list_users_handler, to_list_users_queue, response_queue, epoll_instance
-        );
-        LOG_DEBUG("ListUsersHandlerThread created");
+        LOG_DEBUG("Creating JoinPublicChatHandler...");
+        auto join_handler = std::make_shared<JoinPublicChatHandler>();
+        LOG_DEBUG("JoinPublicChatHandler created");
 
-        // 5. CREATE ROUTER THREAD
+        LOG_DEBUG("Creating LeavePublicChatHandler...");
+        auto leave_handler = std::make_shared<LeavePublicChatHandler>();
+        LOG_DEBUG("LeavePublicChatHandler created");
+
+        // 4. CREATE HANDLER THREADS
+        LOG_DEBUG("Creating PublicChatThreadHandler...");
+        auto public_thread = std::make_shared<PublicChatThreadHandler>(public_handler, to_public_queue, response_queue);
+        LOG_DEBUG("PublicChatThreadHandler created");
+        
+        LOG_DEBUG("Creating ListUsersThreadHandler...");
+        auto list_users_thread = std::make_shared<ListUsersThreadHandler>(list_users_handler, to_list_users_queue, response_queue, epoll_instance);
+        LOG_DEBUG("ListUsersThreadHandler created");
+
+        LOG_DEBUG("Creating JoinPublicChatThreadHandler...");
+        auto join_thread = std::make_shared<JoinPublicChatThreadHandler>(join_handler, to_join_queue, response_queue);
+        LOG_DEBUG("JoinPublicChatThreadHandler created");
+
+        LOG_DEBUG("Creating LeavePublicChatThreadHandler...");
+        auto leave_thread = std::make_shared<LeavePublicChatThreadHandler>(leave_handler, to_leave_queue, response_queue);
+        LOG_DEBUG("LeavePublicChatThreadHandler created");
+
         LOG_DEBUG("Creating router thread...");
-        auto router = std::make_shared<ChatControllerThread>(incoming_queue);
+        auto router = std::make_shared<ChatControllerThread>(incoming_queue, epoll_instance);
         router->registerHandlerQueue(CommandType::PUBLIC_CHAT, to_public_queue);
         router->registerHandlerQueue(CommandType::LIST_USERS, to_list_users_queue);
+        router->registerHandlerQueue(CommandType::JOIN_PUBLIC_CHAT_ROOM, to_join_queue);
+        router->registerHandlerQueue(CommandType::LEAVE_PUBLIC_CHAT_ROOM, to_leave_queue);
         LOG_DEBUG("ChatControllerThread created and configured");
         
         // 6. CREATE RESPONSE DISPATCHER
@@ -97,8 +111,7 @@ int main(){
         addr.sin_addr.s_addr = INADDR_ANY;
         addr.sin_port = htons(8080);
         
-        auto server = std::make_shared<TCPServer>(
-            addr, epoll_instance, thread_pool, incoming_queue
+        auto server = std::make_shared<TCPServer>(addr, epoll_instance, thread_pool, incoming_queue
         );
         
         server->startServer();
@@ -108,10 +121,16 @@ int main(){
         LOG_INFO("Starting worker threads...");
         
         public_thread->start();
-        LOG_INFO("PublicChatHandler Thread started");
+        LOG_INFO("PublicChatThreadHandler started");
         
         list_users_thread->start();
-        LOG_INFO("ListUsersHandler Thread started");
+        LOG_INFO("ListUsersThreadHandler started");
+
+        join_thread->start();
+        LOG_INFO("JoinPublicChatThreadHandler started");
+        
+        leave_thread->start();
+        LOG_INFO("LeavePublicChatThreadHandler started");
 
         router->start();
         LOG_INFO("Router Thread started");
@@ -162,10 +181,16 @@ int main(){
         LOG_INFO("Router stopped");
         
         public_thread->stop();
-        LOG_INFO("PublicChatHandler stopped");
+        LOG_INFO("PublicChatThreadHandler stopped");
 
         list_users_thread->stop();
-        LOG_INFO("ListUsersHandler stopped");
+        LOG_INFO("ListUsersThreadHandler stopped");
+
+        join_thread->stop();
+        LOG_INFO("JoinPublicChatRoomThreadHandler stopped");
+
+        leave_thread->stop();
+        LOG_INFO("LeavePublicChatRoomThreadHandler stopped");
 
         response_dispatcher->stop();
         LOG_INFO("Response Dispatcher stopped");

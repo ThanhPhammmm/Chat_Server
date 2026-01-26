@@ -7,8 +7,9 @@ INCLUDES = \
 	-Iinclude/MessageHandler \
 	-Iinclude/Controller \
 	-Iinclude/ThreadHandler \
-	-Iinclude/ThreadMessageHandler \
-	-Iinclude/Logger
+	-Iinclude/MessageThreadHandler \
+	-Iinclude/Logger \
+	-Iinclude/PublicChatRoom
 
 RUN_DIR = RunProgram
 
@@ -24,7 +25,8 @@ SERVER_SRCS = \
 	source/Controller/*.cpp \
 	source/MessageHandler/*.cpp \
 	source/ThreadHandler/*.cpp \
-	source/Logger/*.cpp
+	source/Logger/*.cpp \
+	source/PublicChatRoom/*.cpp
 
 CLIENT_SRCS = source/Client/client.cpp
 

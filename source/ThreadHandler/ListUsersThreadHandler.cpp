@@ -1,6 +1,6 @@
-#include "ListUsersHandlerThread.h"
+#include "ListUsersThreadHandler.h"
 
-ListUsersHandlerThread::ListUsersHandlerThread(std::shared_ptr<ListUsersHandler> handler,
+ListUsersThreadHandler::ListUsersThreadHandler(std::shared_ptr<ListUsersHandler> handler,
                                                std::shared_ptr<MessageQueue<HandlerRequestPtr>> req_queue,
                                                std::shared_ptr<MessageQueue<HandlerResponsePtr>> resp_queue,
                                                std::shared_ptr<EpollInstance> epoll_instance)
@@ -8,7 +8,7 @@ ListUsersHandlerThread::ListUsersHandlerThread(std::shared_ptr<ListUsersHandler>
       list_users_handler(handler),
       epoll_instance(epoll_instance) {}
 
-void ListUsersHandlerThread::run(){
+void ListUsersThreadHandler::run(){
     LOG_INFO_STREAM("┌────────────────────────────────────┐");
     LOG_INFO_STREAM("│   [ListUsersHandler] Started       │");
     LOG_INFO_STREAM("│ TID: " << std::this_thread::get_id());
@@ -34,8 +34,8 @@ void ListUsersHandlerThread::run(){
             resp->response_message = response;
             resp->fd = req->fd;
             resp->request_id = req->request_id;
-            resp->is_public = false;
-            resp->is_private = false;
+            resp->is_public_room = false;
+            resp->is_private_room = false;
             resp->is_broadcast = false;  // No broadcast for now
             resp->is_list_users = true;
             resp->exclude_fd = -1;

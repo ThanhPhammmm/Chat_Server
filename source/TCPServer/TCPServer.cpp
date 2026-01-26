@@ -12,7 +12,7 @@ static void setNonBlock(int fd){
 }
 
 TCPServer::TCPServer(const sockaddr_in& addr, 
-                     EpollPtr epoll, 
+                     EpollInstancePtr epoll, 
                      ThreadPoolPtr thread_pool,
                      std::shared_ptr<MessageQueue<Message>> to_router)
     : epoll_instance(epoll), 

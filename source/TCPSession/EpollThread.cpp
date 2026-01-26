@@ -2,7 +2,7 @@
 #include "Epoll.h"
 #include "TCPServer.h"
 
-EpollThread::EpollThread(EpollPtr epoll) : epoll_instance(epoll) {}
+EpollThread::EpollThread(EpollInstancePtr epoll) : epoll_instance(epoll) {}
 
 void EpollThread::start(){
     running.store(true);
@@ -28,7 +28,7 @@ void EpollThread::run(){
     LOG_INFO_STREAM("[EpollThread] Stopped");
 }
 
-EpollPtr EpollThread::getEpoll(){
+EpollInstancePtr EpollThread::getEpoll(){
     return epoll_instance;
 }
 

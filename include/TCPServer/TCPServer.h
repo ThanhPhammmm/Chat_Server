@@ -14,15 +14,15 @@
 
 #include "EpollThread.h"
 #include "ChatControllerThread.h"
-#include "PublicChatHandlerThread.h"
+#include "PublicChatThreadHandler.h"
 #include "PublicChatHandler.h"
 #include "Responser.h"
 #include "MessageQueue.h"
 #include "Message.h"
-#include "ThreadMessageHandler.h"
+#include "MessageThreadHandler.h"
 #include "Logger.h"
 #include "ListUsersHandler.h"
-#include "ListUsersHandlerThread.h"
+#include "ListUsersThreadHandler.h"
 #include "ThreadPool.h"
 #include "Connection.h"
 #include "Epoll.h"
@@ -30,7 +30,10 @@
 #include "CommandParser.h"
 #include "BaseThreadHandler.h"
 #include "MessageHandler.h"
-
+#include "JoinPublicChatRoomHandler.h"
+#include "JoinPublicChatRoomThreadHandler.h"
+#include "LeavePublicChatRoomHandler.h"
+#include "LeavePublicChatRoomThreadHandler.h"
 
 #define BUFFER_SIZE 4096
 #define MAX_EVENTS 1024
@@ -38,7 +41,7 @@
 class TCPServer : public std::enable_shared_from_this<TCPServer>{
     private:
         int listen_fd;
-        EpollPtr epoll_instance;
+        EpollInstancePtr epoll_instance;
         ThreadPoolPtr thread_pool_instance;
         std::shared_ptr<MessageQueue<Message>> to_router_queue;
 
@@ -47,7 +50,7 @@ class TCPServer : public std::enable_shared_from_this<TCPServer>{
 
     public:
         TCPServer(const sockaddr_in& addr, 
-                EpollPtr epoll, 
+                EpollInstancePtr epoll, 
                 ThreadPoolPtr thread_pool,
                 std::shared_ptr<MessageQueue<Message>> to_router);
         ~TCPServer();

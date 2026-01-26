@@ -1,12 +1,12 @@
-#include "PublicChatHandlerThread.h"
+#include "PublicChatThreadHandler.h"
 
-PublicChatHandlerThread::PublicChatHandlerThread(std::shared_ptr<PublicChatHandler> handler,
+PublicChatThreadHandler::PublicChatThreadHandler(std::shared_ptr<PublicChatHandler> handler,
                                                  std::shared_ptr<MessageQueue<HandlerRequestPtr>> req_queue,
                                                  std::shared_ptr<MessageQueue<HandlerResponsePtr>> resp_queue) 
     : BaseThreadHandler(handler, req_queue, resp_queue, "PublicChatHandler"),
       public_chat_handler(handler) {}
 
-void PublicChatHandlerThread::run(){
+void PublicChatThreadHandler::run(){
     LOG_INFO_STREAM("┌────────────────────────────────────┐");
     LOG_INFO_STREAM("│ [PublicChatHandler] Started");
     LOG_INFO_STREAM("│ TID: " << std::this_thread::get_id());
@@ -31,11 +31,20 @@ void PublicChatHandlerThread::run(){
             resp->response_message = response;
             resp->fd = req->fd;
             resp->request_id = req->request_id;
-            resp->is_public = true;
-            resp->is_private = false;
-            resp->is_broadcast = false;  // No broadcast for now
+            
+            // Back to client
+            if(response.find("Error:") == 0){
+                resp->is_error = true;
+            }
+            else{
+                resp->is_broadcast = true;
+                resp->is_public_room = true;
+                resp->is_private_room = false;
+                resp->is_error = false;
+                resp->exclude_fd = -1;
+            }
+            
             resp->is_list_users = false;
-            resp->exclude_fd = -1;
             
             if(running.load()){
                 response_queue->push(resp);

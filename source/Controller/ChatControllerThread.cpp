@@ -1,8 +1,8 @@
 #include "ChatControllerThread.h"
-#include "TCPServer.h"
-
-ChatControllerThread::ChatControllerThread(std::shared_ptr<MessageQueue<Message>> incoming_queue)
-    : incoming_queue(incoming_queue) {}
+#include "Logger.h"
+ChatControllerThread::ChatControllerThread(std::shared_ptr<MessageQueue<Message>> incoming_queue, EpollInstancePtr epoll_instance)
+    : incoming_queue(incoming_queue),
+      epoll_instance(epoll_instance) {}
 
 void ChatControllerThread::registerHandlerQueue(CommandType type, std::shared_ptr<MessageQueue<HandlerRequestPtr>> queue){
     handler_queues[type] = queue;
@@ -52,10 +52,6 @@ void ChatControllerThread::run(){
                 }
                 break;
                 
-            // case MessageType::CLIENT_DISCONNECTED:
-            //     handleDisconnect(std::get<ClientDisconnected>(msg.payload));
-            //     break;
-                
             case MessageType::SHUTDOWN:
                 running.store(false);
                 break;
@@ -67,22 +63,22 @@ void ChatControllerThread::run(){
 
     LOG_INFO_STREAM("[ChatControllerThread] Stopped");}
 
-void ChatControllerThread::routeMessage(const IncomingMessage& incoming, CommandParser& parser){
+void ChatControllerThread::routeMessage(IncomingMessage& incoming, CommandParser& parser){
     std::string content = incoming.content;
-    auto cmd = parser.parse(content);
+    auto cmd = parser.parse(content, incoming,epoll_instance);
     
     auto it = handler_queues.find(cmd->type);
     if(it == handler_queues.end()){
-        LOG_WARNING_STREAM("[Router] Unknown command type: " << static_cast<int>(cmd->type) 
-                          << " from fd=" << incoming.fd);
+        LOG_WARNING_STREAM("[Router] Unknown command type: " << static_cast<int>(cmd->type) << " from fd=" << incoming.fd);
         
         if(cmd->type == CommandType::UNKNOWN && incoming.connection && !incoming.connection->isClosed()){
             std::string error_msg = "Error: Unknown command. Available commands:\n"
-                                   "  /all or /public_chat                              - Send public message\n"
+                                   "  /join_public_chat_room                            - Join public message\n"
+                                   " /leave_public_chat_room                            - Leave public chat room"
                                    "  /login <name>                                     - Login (not implemented)\n"
                                    "  /logout                                           - Logout (not implemented)\n"
                                    "  /list_users                                       - List users (not implemented)\n"
-                                   "  /msg <user> <msg>  or /private_chat              - Private message (not implemented)\n";
+                                   "  /msg <user> <msg>  or /private_chat               - Private message (not implemented)\n";
             
             int fd = incoming.fd;
             send(fd, error_msg.c_str(), error_msg.size(), MSG_NOSIGNAL);
@@ -103,9 +99,3 @@ void ChatControllerThread::routeMessage(const IncomingMessage& incoming, Command
                     << " to handler for type "
                     << static_cast<int>(cmd->type));
 }
-
-// void ChatControllerThread::handleDisconnect(const ClientDisconnected& disc){
-//     int fd = disc.fd;
-//     std::cout << "[Router] Handling disconnect for fd: " << fd << "\n";
-//     // Additional cleanup logic can be added here
-// }

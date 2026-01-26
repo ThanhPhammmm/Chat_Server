@@ -2,10 +2,10 @@
 
 #include "MessageHandler.h"
 
-class PublicChatHandler : public MessageHandler{
+class JoinPublicChatHandler : public MessageHandler{
     public:
         std::string handleMessage(ConnectionPtr conn, CommandPtr command, EpollInstancePtr epoll_instance = nullptr) override;
         bool canHandle(CommandType type) override;
 };
 
-using PublicChatHandlerPtr = std::shared_ptr<PublicChatHandler>;
+using JoinPublicChatHandlerPtr = std::shared_ptr<JoinPublicChatHandler>;

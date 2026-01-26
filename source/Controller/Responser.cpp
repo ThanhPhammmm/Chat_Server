@@ -1,9 +1,10 @@
 #include "Responser.h"
 #include "TCPServer.h"
+#include "PublicChatRoom.h"
 
 Responser::Responser(std::shared_ptr<MessageQueue<HandlerResponsePtr>> resp_queue,
                      ThreadPoolPtr pool,
-                     EpollPtr epoll)
+                     EpollInstancePtr epoll)
     : response_queue(resp_queue),
       thread_pool(pool),
       epoll_instance(epoll) {}
@@ -40,13 +41,18 @@ void Responser::run(){
         }
         
         auto resp = resp_opt.value();
-        if(resp->is_broadcast){
-            //broadcastMessage(resp);
-        } 
-        else if(resp->is_public){
-            std::cout << resp->response_message << "\n"; 
+        if(resp->is_broadcast && resp->is_public_room){
+            if(resp->is_error){
+                sendToClient(resp);
+            }
+            else{
+                broadcastToRoom(resp);
+            }
         }
-        else{
+        else if(resp->is_list_users){
+            sendToClient(resp);
+        }
+        else if(resp->is_private){
             sendToClient(resp);
         }
     }
@@ -59,8 +65,7 @@ void Responser::sendToClient(HandlerResponsePtr resp){
         LOG_WARNING("Attempted to send to null connection");
         return;
     }
-    thread_pool->submit([conn = resp->connection, 
-                        content = resp->response_message](){
+    thread_pool->submit([conn = resp->connection, content = resp->response_message](){
         if(!conn || conn->isClosed()){
             return;
         }        
@@ -72,7 +77,6 @@ void Responser::sendToClient(HandlerResponsePtr resp){
         size_t remaining = content.size();
         int retry_count = 0;
         const int MAX_RETRIES = 3;
-
         while(remaining > 0 && retry_count < MAX_RETRIES){
             if(conn->isClosed()) break;
             
@@ -106,19 +110,75 @@ void Responser::sendToClient(HandlerResponsePtr resp){
             }
         }
         if(remaining > 0){
-            LOG_WARNING_STREAM("Failed to send complete message (fd=" << fd 
-                             << ", " << remaining << " bytes remaining)");
+            LOG_WARNING_STREAM("Failed to send complete message (fd=" << fd << ", " << remaining << " bytes remaining)");
         }
     });
 }
 
-// void broadcastMessage(HandlerResponsePtr resp){
-//     // Get all connections from epoll
-//     // For each connection (except exclude_fd), send message
+void Responser::broadcastToRoom(HandlerResponsePtr resp){
+    if(!resp){
+        LOG_WARNING("Attempted to broadcast null response");
+        return;
+    }
+
+    PublicChatRoom tmp;
+    auto& room = tmp.getInstance();
+    auto members = room.getParticipants();
+    LOG_DEBUG_STREAM("[Broadcast] Sending to " << members.size() << " members in public chat room");
     
-//     std::cout << "[Broadcast] Message: " << resp->response_message 
-//                 << " (exclude fd=" << resp->exclude_fd << ")\n";
+    int sent_count = 0;
+    for(int member_fd : members){
+        if(resp->exclude_fd >= 0 && member_fd == resp->exclude_fd){
+            continue;
+        }
+        
+        auto conn = epoll_instance->getConnection(member_fd);
+        if(!conn || conn->isClosed()){
+            room.leave(member_fd);
+            continue;
+        }
+        
+        thread_pool->submit([conn, content = resp->response_message, member_fd](){
+            if(!conn || conn->isClosed()) return;
+            
+            const char* data = content.data();
+            size_t remaining = content.size();
+            int retry_count = 0;
+            const int MAX_RETRIES = 3;
+
+            while(remaining > 0 && retry_count < MAX_RETRIES){
+                if(conn->isClosed()) break;
+                
+                ssize_t sent = send(member_fd, data, remaining, MSG_NOSIGNAL);
+                
+                if(sent < 0){
+                    if(errno == EAGAIN || errno == EWOULDBLOCK){
+                        usleep(1000);
+                        retry_count++;
+                        continue;
+                    }
+                    else if(errno == EPIPE || errno == ECONNRESET){
+                        LOG_DEBUG_STREAM("[Broadcast] Connection closed (fd=" << member_fd << ")");
+                        break;
+                    }
+                    else{
+                        LOG_ERROR_STREAM("[Broadcast] Send error (fd=" << member_fd << "): " << strerror(errno));
+                        break;
+                    }
+                }
+                else if(sent == 0){
+                    break;
+                }
+                else{
+                    data += sent;
+                    remaining -= sent;
+                    retry_count = 0;
+                }
+            }
+        });
+        
+        sent_count++;
+    }
     
-//     // TODO: Need to iterate all connections
-//     // This requires exposing connections from EpollInstance
-// }
+    LOG_INFO_STREAM("[Broadcast] Sent to " << sent_count << " members in room");
+}

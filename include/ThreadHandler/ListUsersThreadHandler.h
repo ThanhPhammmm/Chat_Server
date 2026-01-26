@@ -3,11 +3,11 @@
 #include "BaseThreadHandler.h"
 #include "ListUsersHandler.h"
 #include "MessageQueue.h"
-#include "ThreadMessageHandler.h"
+#include "MessageThreadHandler.h"
 #include "Epoll.h"
 #include "Logger.h"
 
-class ListUsersHandlerThread : public BaseThreadHandler{
+class ListUsersThreadHandler : public BaseThreadHandler{
     private:
         std::shared_ptr<ListUsersHandler> list_users_handler;
         std::shared_ptr<EpollInstance> epoll_instance;
@@ -15,10 +15,10 @@ class ListUsersHandlerThread : public BaseThreadHandler{
         void run() override;
 
     public:
-        ListUsersHandlerThread(std::shared_ptr<ListUsersHandler> handler,
+        ListUsersThreadHandler(std::shared_ptr<ListUsersHandler> handler,
                                std::shared_ptr<MessageQueue<HandlerRequestPtr>> req_queue,
                                std::shared_ptr<MessageQueue<HandlerResponsePtr>> resp_queue,
                                std::shared_ptr<EpollInstance> epoll_instance);
 };
 
-using ListUsersHandlerThreadPtr = std::shared_ptr<ListUsersHandlerThread>;
+using ListUsersHandlerThreadPtr = std::shared_ptr<ListUsersThreadHandler>;

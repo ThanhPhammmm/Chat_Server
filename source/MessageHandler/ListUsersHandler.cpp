@@ -4,7 +4,7 @@ bool ListUsersHandler::canHandle(CommandType type){
     return type == CommandType::LIST_USERS;
 }
 
-std::string ListUsersHandler::handleMessage(ConnectionPtr conn, CommandPtr command, EpollPtr epoll_instance){
+std::string ListUsersHandler::handleMessage(ConnectionPtr conn, CommandPtr command, EpollInstancePtr epoll_instance){
     auto all_users = epoll_instance->getAllConnections();
 
     std::string begin = std::to_string(conn->getFd()) + " requested users list successfully.\n";

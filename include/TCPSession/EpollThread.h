@@ -8,16 +8,16 @@
 
 class EpollThread{
     private:
-        EpollPtr epoll_instance;
+        EpollInstancePtr epoll_instance;
         std::thread worker_thread;
         std::atomic<bool> running{false};   
     
         void run();
     public:
-        EpollThread(EpollPtr epoll);
+        EpollThread(EpollInstancePtr epoll);
         void start();
         void stop();
-        EpollPtr getEpoll();
+        EpollInstancePtr getEpoll();
 };
 
 using EpollThreadPtr = std::shared_ptr<EpollThread>;

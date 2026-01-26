@@ -1,4 +1,5 @@
-#include "TCPServer.h"
+#include "Epoll.h"
+#include "Logger.h"
 
 EpollInstance::EpollInstance(){
     epfd = epoll_create1(0);
@@ -37,6 +38,11 @@ EpollInstance::~EpollInstance(){
     }
 }
 
+// EpollInstance& EpollInstance::GetInstance(){
+//     static EpollInstance epfd;
+//     return epfd;
+// }
+
 void EpollInstance::addFd(int fd, Callback cb, ConnectionPtr conn){
     if(should_stop.load(std::memory_order_acquire)){
         std::cerr << "[WARNING] Attempted to add fd to stopped EpollInstance" << std::endl;
@@ -57,6 +63,7 @@ void EpollInstance::addFd(int fd, Callback cb, ConnectionPtr conn){
 
     if(conn){
         connections[fd] = conn;
+        epoll_fds.insert(fd);
     }
 }
 
@@ -143,7 +150,7 @@ void EpollInstance::stop(){
     should_stop.store(true, std::memory_order_release);
 }
 
-bool EpollInstance::isStopped() const{
+bool EpollInstance::isStopped(){
     return should_stop.load(std::memory_order_acquire);
 }
 
@@ -158,4 +165,8 @@ std::vector<ConnectionPtr> EpollInstance::getAllConnections(){
         }
     }
     return conns;
+}
+
+bool EpollInstance::isEpollMember(int fd){
+    return epoll_fds.find(fd) != epoll_fds.end();
 }

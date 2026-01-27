@@ -51,7 +51,7 @@ TCPServer::TCPServer(const sockaddr_in& addr,
     
     setNonBlock(listen_fd);
     
-    LOG_INFO_STREAM("[INFO] Server listening on port " << ntohs(addr.sin_port));}
+    LOG_DEBUG_STREAM("[INFO] Server listening on port " << ntohs(addr.sin_port));}
 
 TCPServer::~TCPServer(){
     if(listen_fd >= 0){
@@ -62,9 +62,12 @@ TCPServer::~TCPServer(){
 void TCPServer::onRead(int clientFd){
     ConnectionPtr conn = epoll_instance->getConnection(clientFd);
     if(!conn || conn->isClosed()){
+        LOG_DEBUG_STREAM("Connection not found or closed for fd=" << clientFd);
         return;
     }
     
+    size_t total_bytes_read = 0;
+
     while(true){
         char buf[BUFFER_SIZE];
         ssize_t n = recv(clientFd, buf, BUFFER_SIZE - 1, 0);
@@ -80,11 +83,20 @@ void TCPServer::onRead(int clientFd){
         }
         
         if(n == 0){
-            LOG_INFO_STREAM("Client disconnected fd=" << clientFd);
             epoll_instance->removeFd(clientFd);
+            LOG_INFO_STREAM("Client disconnected fd=" << clientFd);
             return;
         }
         
+        total_bytes_read += n;
+        
+        // Prevent DoS by limiting message size
+        if(total_bytes_read > MAX_MESSAGE_SIZE){
+            LOG_WARNING_STREAM("Message too large from fd=" << clientFd << " (" << total_bytes_read << " bytes), closing connection");
+            epoll_instance->removeFd(clientFd);
+            return;
+        }
+
         buf[n] = '\0';
         std::string content(buf, n);
         if(content.empty()){
@@ -97,8 +109,7 @@ void TCPServer::onRead(int clientFd){
         to_router_queue->push(std::move(msg));
 
         LOG_DEBUG_STREAM("[TCPServer] Received " << n << " bytes from fd=" << clientFd);
-        LOG_DEBUG_STREAM("[TCPServer] Pushed message from fd=" << clientFd
-                        << " to router queue");
+        LOG_DEBUG_STREAM("[TCPServer] Pushed message from fd=" << clientFd << " to router queue");
     }
 }
 
@@ -119,10 +130,7 @@ void TCPServer::onAccept(int fd){
 
         char client_ip[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, sizeof(client_ip));
-        LOG_INFO_STREAM("New connection from "
-                        << client_ip << ":"
-                        << ntohs(client_addr.sin_port)
-                        << " fd=" << cfd);
+        LOG_INFO_STREAM("New connection from " << client_ip << ":" << ntohs(client_addr.sin_port) << " fd=" << cfd);
 
         setNonBlock(cfd);
 
@@ -146,16 +154,12 @@ void TCPServer::startServer(){
             self->onAccept(fd);
         }
     });
-    
-    LOG_INFO_STREAM("Server started successfully");
 }
 
 void TCPServer::stopServer(){
-    LOG_INFO_STREAM("Stopping server...");
     if(listen_fd >= 0){
         epoll_instance->removeFd(listen_fd);
         close(listen_fd);
         listen_fd = -1;
     }
-    LOG_INFO_STREAM("Server stopped");
 }

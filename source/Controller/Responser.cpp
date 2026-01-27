@@ -1,6 +1,6 @@
 #include "Responser.h"
-#include "TCPServer.h"
 #include "PublicChatRoom.h"
+#include "Logger.h"
 
 Responser::Responser(std::shared_ptr<MessageQueue<HandlerResponsePtr>> resp_queue,
                      ThreadPoolPtr pool,
@@ -23,16 +23,8 @@ void Responser::stop(){
 }
 
 void Responser::run(){
-    LOG_INFO_STREAM("┌────────────────────────────────────┐");
-    LOG_INFO_STREAM("│    [ResponseDispatcher] Started    │");
-    LOG_INFO_STREAM("│ TID: " << std::this_thread::get_id());
-    LOG_INFO_STREAM("└────────────────────────────────────┘");
-
     while(running.load()){
-        auto resp_opt = response_queue->pop(10);
-        
-        if(!resp_opt.has_value()) continue;
-        
+        auto resp_opt = response_queue->pop(100);        
         if(!resp_opt.has_value()){
             if(!running.load()){
                 break;
@@ -41,26 +33,90 @@ void Responser::run(){
         }
         
         auto resp = resp_opt.value();
-        if(resp->is_broadcast && resp->is_public_room){
-            if(resp->is_error){
+        if(!resp){
+            LOG_WARNING("Received null response");
+            continue;
+        }
+
+        switch(resp->destination){
+            case ResponseDestination::DIRECT_TO_CLIENT:
                 sendToClient(resp);
-            }
-            else{
+                break;
+
+            case ResponseDestination::ERROR_TO_CLIENT:
+                sendBackToClient(resp);
+                break;
+                
+            case ResponseDestination::BACK_TO_CLIENT:
+                sendBackToClient(resp);
+                break;
+            case ResponseDestination::BROADCAST_PUBLIC_CHAT_ROOM:
                 broadcastToRoom(resp);
-            }
-        }
-        else if(resp->is_list_users){
-            sendToClient(resp);
-        }
-        else if(resp->is_private){
-            sendToClient(resp);
+                break;
+                
+            default:
+                LOG_ERROR_STREAM("Unknown response destination: " << static_cast<int>(resp->destination));
+                break;
         }
     }
-
-    LOG_INFO_STREAM("[ResponseDispatcher] Stopped");
 }
 
 void Responser::sendToClient(HandlerResponsePtr resp){
+    if(!resp || !resp->connection){
+        LOG_WARNING("Attempted to send to null connection");
+        return;
+    }
+    thread_pool->submit([conn = resp->connection, content = resp->response_message, user_destination = resp->user_destination](){
+        if(!conn || conn->isClosed()){
+            return;
+        }        
+        int fd = conn->getFd();
+        if(fd < 0){
+            return;
+        }        
+        const char* data = content.data();
+        size_t remaining = content.size();
+        int retry_count = 0;
+        const int MAX_RETRIES = 3;
+        while(remaining > 0 && retry_count < MAX_RETRIES){
+            if(conn->isClosed()) break;
+            
+            ssize_t sent = send(user_destination, data, remaining, MSG_NOSIGNAL);
+            
+            if(sent < 0){
+                if(errno == EAGAIN || errno == EWOULDBLOCK){
+                    usleep(1000);
+                    retry_count++;
+                    continue;
+                }
+                else if(errno == EPIPE || errno == ECONNRESET){
+                    LOG_DEBUG_STREAM("Connection closed during send (fd=" << fd << ")");
+                    break;
+                }
+                else{
+                    LOG_ERROR_STREAM("Send error (fd=" << fd << "): " << strerror(errno));
+                    break;
+                }
+                perror("send");
+                break;
+            }
+            else if(sent == 0){
+                LOG_WARNING_STREAM("Send returned 0 (fd=" << fd << ")");
+                break;
+            }
+            else{
+                data += sent;
+                remaining -= sent;
+                retry_count = 0;
+            }
+        }
+        if(remaining > 0){
+            LOG_WARNING_STREAM("Failed to send complete message (fd=" << fd << ", " << remaining << " bytes remaining)");
+        }
+    });
+}
+
+void Responser::sendBackToClient(HandlerResponsePtr resp){
     if(!resp || !resp->connection){
         LOG_WARNING("Attempted to send to null connection");
         return;
@@ -180,5 +236,5 @@ void Responser::broadcastToRoom(HandlerResponsePtr resp){
         sent_count++;
     }
     
-    LOG_INFO_STREAM("[Broadcast] Sent to " << sent_count << " members in room");
+    LOG_DEBUG_STREAM("[Broadcast] Sent to " << sent_count << " members in room");
 }

@@ -74,6 +74,7 @@ void EpollInstance::removeFd(int fd){
     {
         std::lock_guard<std::mutex> lock(handlers_mutex);
         handlers.erase(fd);
+        epoll_fds.erase(fd);
         
         auto it = connections.find(fd);
         if(it != connections.end()){
@@ -99,12 +100,12 @@ ConnectionPtr EpollInstance::getConnection(int fd){
 void EpollInstance::run(){
     epoll_event events[MAX_EVENTS];
 
-    while(!should_stop.load()){
+    while(!should_stop.load(std::memory_order_acquire)){
         int n = epoll_wait(epfd, events, 1024, 1000);
         
         if(n < 0){
             if(errno == EINTR) continue;
-            perror("epoll_wait");
+            LOG_ERROR_STREAM("epoll_wait failed: " << strerror(errno));
             break;
         }
         
@@ -115,6 +116,7 @@ void EpollInstance::run(){
             uint32_t ev = events[i].events;
             
             if(ev & (EPOLLERR | EPOLLHUP | EPOLLRDHUP)){
+                LOG_DEBUG_STREAM("Epoll error event on fd=" << fd);
                 removeFd(fd);
                 continue;
             }
@@ -132,12 +134,11 @@ void EpollInstance::run(){
                     handler(fd);
                 }
                 catch(const std::exception& e){
-                    std::cerr << "[ERROR] Handler exception for fd=" << fd 
-                             << ": " << e.what() << std::endl;
+                    LOG_ERROR_STREAM("Handler exception for fd=" << fd << ": " << e.what());
                     removeFd(fd);
                 }
                 catch(...){
-                    std::cerr << "[ERROR] Unknown handler exception for fd=" << fd << std::endl;
+                    LOG_ERROR_STREAM("Unknown handler exception for fd=" << fd);
                     removeFd(fd);
                 }
             }
@@ -168,5 +169,6 @@ std::vector<ConnectionPtr> EpollInstance::getAllConnections(){
 }
 
 bool EpollInstance::isEpollMember(int fd){
+    std::lock_guard<std::mutex> lock(handlers_mutex);
     return epoll_fds.find(fd) != epoll_fds.end();
 }

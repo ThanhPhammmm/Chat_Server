@@ -4,11 +4,6 @@
 #include "Message.h"
 #include "MessageThreadHandler.h"
 #include "CommandParser.h"
-#include <thread>
-#include <atomic>
-#include <unordered_map>
-#include <memory>
-#include <iostream>
 #include "Epoll.h"
 
 class ChatControllerThread{

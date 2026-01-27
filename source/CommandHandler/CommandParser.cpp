@@ -6,12 +6,25 @@ CommandPtr CommandParser::parse(std::string& message, IncomingMessage& incomming
     cmd->raw_message = message;
 
     if(message.empty()){
+        cmd->type = CommandType::UNKNOWN;
         return cmd;
     }
 
-    PublicChatRoom tmp_public_chat_room;
     if(message[0] != '/'){
-        if(tmp_public_chat_room.getInstance().isParticipant(epoll_instance->getConnection(incomming.fd)->getFd()) == 0){
+        if(!epoll_instance){
+            cmd->type = CommandType::UNKNOWN;
+            return cmd;
+        }
+        
+        auto conn = epoll_instance->getConnection(incomming.fd);
+        if(!conn){
+            cmd->type = CommandType::UNKNOWN;
+            return cmd;
+        }
+        
+        PublicChatRoom temp_public_chat_room;
+        auto& room = temp_public_chat_room.getInstance();
+        if(!room.isParticipant(conn->getFd())){
             cmd->type = CommandType::UNKNOWN;
         }
         else{
@@ -36,9 +49,18 @@ CommandPtr CommandParser::parse(std::string& message, IncomingMessage& incomming
     else if(command_name == "/logout"){
         cmd->type = CommandType::LOGOUT;
     } 
-    else if(command_name == "/list_users"){
-        cmd->type = CommandType::LIST_USERS;
-    } 
+    else if(command_name == "/list_online_users"){
+        auto conn = epoll_instance->getConnection(incomming.fd);
+
+        PublicChatRoom temp_public_chat_room;
+        auto& room = temp_public_chat_room.getInstance();
+        if(!room.isParticipant(conn->getFd())){
+            cmd->type = CommandType::LIST_ONLINE_USERS;
+        }
+        else{
+            cmd->type = CommandType::LIST_USERS_IN_PUBLIC_CHAT_ROOM;
+        }
+    }
     else if(command_name == "/private_chat"){
         cmd->type = CommandType::PRIVATE_CHAT;
     } 

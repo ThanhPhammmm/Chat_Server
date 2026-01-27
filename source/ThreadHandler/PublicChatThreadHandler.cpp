@@ -7,22 +7,21 @@ PublicChatThreadHandler::PublicChatThreadHandler(std::shared_ptr<PublicChatHandl
       public_chat_handler(handler) {}
 
 void PublicChatThreadHandler::run(){
-    LOG_INFO_STREAM("┌────────────────────────────────────┐");
-    LOG_INFO_STREAM("│ [PublicChatHandler] Started");
-    LOG_INFO_STREAM("│ TID: " << std::this_thread::get_id());
-    LOG_INFO_STREAM("└────────────────────────────────────┘");
-
     while(running.load()){
-        auto req_opt = request_queue->pop(10);
-        
+        auto req_opt = request_queue->pop(100);
         if(!req_opt.has_value()){
             if(!running.load()){
                 break;
             }
             continue;
-        }        
+        }
+
         auto req = req_opt.value();
-        
+        if(!req || !req->connection){
+            LOG_WARNING("Received null request or connection");
+            continue;
+        }
+
         std::string response = public_chat_handler->handleMessage(req->connection, req->command);
         
         if(!response.empty()){
@@ -31,20 +30,16 @@ void PublicChatThreadHandler::run(){
             resp->response_message = response;
             resp->fd = req->fd;
             resp->request_id = req->request_id;
+            resp->user_destination = -1;
             
             // Back to client
             if(response.find("Error:") == 0){
-                resp->is_error = true;
+                resp->destination = ResponseDestination::ERROR_TO_CLIENT;
             }
             else{
-                resp->is_broadcast = true;
-                resp->is_public_room = true;
-                resp->is_private_room = false;
-                resp->is_error = false;
-                resp->exclude_fd = -1;
+                resp->destination = ResponseDestination::BROADCAST_PUBLIC_CHAT_ROOM;
             }
-            
-            resp->is_list_users = false;
+            resp->exclude_fd = -1;
             
             if(running.load()){
                 response_queue->push(resp);
@@ -52,5 +47,5 @@ void PublicChatThreadHandler::run(){
         }
     }
 
-    LOG_INFO_STREAM("[PublicChatHandler] Stopped");
+    LOG_INFO_STREAM("[PublicChatThreadHandler] Stopped");
 }

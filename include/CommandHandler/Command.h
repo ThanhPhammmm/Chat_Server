@@ -13,10 +13,19 @@ enum class CommandType{
     LOGOUT,
     PUBLIC_CHAT,
     PRIVATE_CHAT,
-    LIST_USERS,
+    LIST_ONLINE_USERS,
     JOIN_PUBLIC_CHAT_ROOM,
     LEAVE_PUBLIC_CHAT_ROOM,
+    LIST_USERS_IN_PUBLIC_CHAT_ROOM,
     UNKNOWN
+};
+
+enum class ResponseType{
+    SUCCESS,
+    ERROR,
+    BROADCAST,
+    DIRECT_MESSAGE,
+    LIST_RESULT
 };
 
 class Command{

@@ -7,14 +7,8 @@ LeavePublicChatThreadHandler::LeavePublicChatThreadHandler(std::shared_ptr<Leave
       leave_handler(handler) {}
 
 void LeavePublicChatThreadHandler::run(){
-    LOG_INFO_STREAM("┌────────────────────────────────────┐");
-    LOG_INFO_STREAM("│ [LeavePublicChatRoomHandler] Started");
-    LOG_INFO_STREAM("│ TID: " << std::this_thread::get_id());
-    LOG_INFO_STREAM("└────────────────────────────────────┘");
-
     while(running.load()){
-        auto req_opt = request_queue->pop(10);
-        
+        auto req_opt = request_queue->pop(100);
         if(!req_opt.has_value()){
             if(!running.load()){
                 break;
@@ -23,6 +17,10 @@ void LeavePublicChatThreadHandler::run(){
         }
         
         auto req = req_opt.value();
+        if(!req || !req->connection){
+            LOG_WARNING("Received null request or connection");
+            continue;
+        }
         
         std::string response = leave_handler->handleMessage(req->connection, req->command);
         
@@ -32,19 +30,17 @@ void LeavePublicChatThreadHandler::run(){
             resp->response_message = response;
             resp->fd = req->fd;
             resp->request_id = req->request_id;
-            resp->is_public_room = false;
-            resp->is_private_room = false;
-            resp->is_private = true; // Back to leaving users
-            resp->is_error = false;
-            resp->is_broadcast = false;
-            resp->is_list_users = false;
+            resp->destination = response.find("Error:") == 0 ? 
+                               ResponseDestination::ERROR_TO_CLIENT : 
+                               ResponseDestination::DIRECT_TO_CLIENT;
             resp->exclude_fd = -1;
-            
+            resp->user_destination = -1;
+
             if(running.load()){
                 response_queue->push(resp);
             }
         }
     }
 
-    LOG_INFO_STREAM("[LeavePublicChatHandler] Stopped");
+    LOG_INFO_STREAM("[LeavePublicChatThreadHandler] Stopped");
 }

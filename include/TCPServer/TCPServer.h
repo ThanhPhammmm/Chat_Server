@@ -34,9 +34,12 @@
 #include "JoinPublicChatRoomThreadHandler.h"
 #include "LeavePublicChatRoomHandler.h"
 #include "LeavePublicChatRoomThreadHandler.h"
+#include "PrivateChatHandler.h"
+#include "PrivateChatThreadHandler.h"
 
 #define BUFFER_SIZE 4096
 #define MAX_EVENTS 1024
+constexpr size_t MAX_MESSAGE_SIZE = 1024 * 1024;  // 1MB limit
 
 class TCPServer : public std::enable_shared_from_this<TCPServer>{
     private:

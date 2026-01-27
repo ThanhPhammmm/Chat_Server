@@ -22,23 +22,24 @@
 #include <thread>
 
 class Connection{
-private:
-    int fd;
-    std::atomic<bool> closed{false};
+    private:
+        std::atomic<int> fd;
+        std::atomic<bool> closed{false};
+        mutable std::mutex close_mutex;
 
-public:
-    explicit Connection(int socket_fd);
-    ~Connection();
+    public:
+        explicit Connection(int socket_fd);
+        ~Connection();
 
-    Connection(const Connection&) = delete;
-    Connection& operator=(const Connection&) = delete;
+        Connection(Connection&) = delete;
+        Connection& operator=(Connection&) = delete;
 
-    Connection(Connection&& other) noexcept;
-    Connection& operator=(Connection&& other) noexcept;
+        Connection(Connection&& other) noexcept;
+        Connection& operator=(Connection&& other) noexcept;
 
-    int getFd();
-    bool isClosed();
-    void close();
+        int getFd();
+        bool isClosed();
+        void close();
 };
 
 using ConnectionPtr = std::shared_ptr<Connection>;

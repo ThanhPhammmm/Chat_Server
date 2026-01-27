@@ -8,18 +8,15 @@
 #include <string>
 #include <chrono>
 
-#define BUFFER_SIZE 4096
+constexpr size_t BUFFER_SIZE = 4096;
 
 std::atomic<bool> running{true};
 
 void setNonBlocking(int fd){
     int flags = fcntl(fd, F_GETFL, 0);
-    fcntl(fd, F_SETFL, flags | O_NONBLOCK);
-}
-
-void setBlocking(int fd){
-    int flags = fcntl(fd, F_GETFL, 0);
-    fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
+    if(flags >= 0){
+        fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+    }
 }
 
 void receiveThread(int sock){
@@ -27,7 +24,7 @@ void receiveThread(int sock){
     
     while(running.load()){
         memset(buffer, 0, BUFFER_SIZE);
-        int n = recv(sock, buffer, BUFFER_SIZE - 1, 0);
+        ssize_t n = recv(sock, buffer, BUFFER_SIZE - 1, 0);  // Leave room for null terminator
         
         if(n < 0){
             if(errno == EAGAIN || errno == EWOULDBLOCK){
@@ -48,6 +45,7 @@ void receiveThread(int sock){
             break;
         }
         
+        // Safe: n is at most BUFFER_SIZE-1
         buffer[n] = '\0';
         
         std::cout << "\r\033[K";  // Clear line
@@ -67,7 +65,7 @@ int main(){
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(8080);
     
-    std::cout << "Enter server IP [type 127.0.0.1]: ";
+    std::cout << "Enter server IP [default: 127.0.0.1]: ";
     std::string server_ip;
     std::getline(std::cin, server_ip);
     if(server_ip.empty()) server_ip = "127.0.0.1";
@@ -106,6 +104,12 @@ int main(){
         }
         
         if(msg.empty()) continue;
+        
+        // Input validation - limit message size
+        if(msg.size() > 4000){
+            std::cout << "⚠️  Message too long (max 4000 chars)\n";
+            continue;
+        }
         
         size_t total_sent = 0;
         size_t remaining = msg.size();

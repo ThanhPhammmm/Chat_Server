@@ -89,9 +89,8 @@ void Logger::setLogFile(const std::string& filename){
     }
 }
 
-void Logger::writeLog(LogLevel level, const std::string& message, 
-                      const std::string& file, int line){
-    if(level < current_level){
+void Logger::writeLog(LogLevel level, const std::string& message, const std::string& file, int line){
+    if(level != current_level){
         return;
     }
     

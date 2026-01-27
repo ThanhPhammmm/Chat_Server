@@ -3,9 +3,6 @@
 #include "MessageHandler.h"
 #include "MessageThreadHandler.h"
 #include "MessageQueue.h"
-#include <thread>
-#include <atomic>
-#include <string>
 
 class BaseThreadHandler{
     protected:
@@ -24,6 +21,7 @@ class BaseThreadHandler{
                           std::shared_ptr<MessageQueue<HandlerRequestPtr>> request_queue,
                           std::shared_ptr<MessageQueue<HandlerResponsePtr>> response_queue,
                           const std::string& handler_name);
+
         virtual ~BaseThreadHandler();
         
         void start();

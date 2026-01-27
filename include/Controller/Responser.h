@@ -4,12 +4,6 @@
 #include "MessageThreadHandler.h"
 #include "ThreadPool.h"
 #include "Epoll.h"
-#include <thread>
-#include <atomic>
-#include <iostream>
-#include <unistd.h>
-#include <sys/socket.h>
-#include <cerrno>
 
 class Responser{
     private:
@@ -20,6 +14,7 @@ class Responser{
         std::atomic<bool> running{false};
 
         void run();
+        void sendBackToClient(HandlerResponsePtr resp);
         void sendToClient(HandlerResponsePtr resp);
         void broadcastToRoom(HandlerResponsePtr resp);
 

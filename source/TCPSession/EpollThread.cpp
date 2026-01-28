@@ -10,11 +10,14 @@ void EpollThread::start(){
 }
 
 void EpollThread::stop(){
-        running.store(false);
+    running.store(false);
+    if(epoll_instance){
         epoll_instance->stop();
-        if(worker_thread.joinable()){
-            worker_thread.join();
-        }
+    }
+
+    if(worker_thread.joinable()){
+        worker_thread.join();
+    }
 }
 
 void EpollThread::run(){

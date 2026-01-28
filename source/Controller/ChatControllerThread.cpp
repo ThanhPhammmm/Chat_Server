@@ -16,7 +16,9 @@ void ChatControllerThread::start(){
 
 void ChatControllerThread::stop(){
     running.store(false);
-    incoming_queue->stop();
+    if(incoming_queue){
+        incoming_queue->stop();
+    }
     for(auto& pair : handler_queues){
         pair.second->stop();
     }

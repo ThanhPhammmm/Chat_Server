@@ -1,14 +1,11 @@
 #include "Logger.h"
 
-Logger::Logger() 
-    : current_level(LogLevel::INFO),
-      console_output(true),
-      file_output(false) {}
+Logger::Logger() : current_level(LogLevel::INFO){
+    worker = std::thread([this](){ workerThread(); });
+}
 
 Logger::~Logger(){
-    if(log_file.is_open()){
-        log_file.close();
-    }
+    stop();
 }
 
 Logger& Logger::getInstance(){
@@ -16,11 +13,96 @@ Logger& Logger::getInstance(){
     return instance;
 }
 
-std::string Logger::getCurrentTime(){
-    auto now = std::chrono::system_clock::now();
-    auto time_t = std::chrono::system_clock::to_time_t(now);
-    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-        now.time_since_epoch()) % 1000;
+void Logger::stop(){
+    if(running.load()){
+        running.store(false);
+        queue_cv.notify_all();
+        
+        if(worker.joinable()){
+            worker.join();
+        }
+        
+        if(log_file.is_open()){
+            log_file.flush();
+            log_file.close();
+        }
+    }
+}
+
+void Logger::flush(){
+    LOG_DEBUG("HI1");
+    std::unique_lock<std::mutex> lock(queue_mutex);
+    LOG_DEBUG("HI2");
+    queue_cv.wait(lock, [this]{ return log_queue.empty(); });
+    LOG_DEBUG("HI3");
+}
+
+void Logger::workerThread(){
+    while(running.load()){
+        std::unique_lock<std::mutex> lock(queue_mutex);
+        
+        queue_cv.wait(lock, [this]{ 
+            return !log_queue.empty() || !running.load(); 
+        });
+        
+        while(!log_queue.empty()){
+            LogMessage msg = std::move(log_queue.front());
+            log_queue.pop();
+            lock.unlock();
+            
+            processLog(msg);
+            
+            lock.lock();
+        }
+    }
+    
+    std::unique_lock<std::mutex> lock(queue_mutex);
+    while(!log_queue.empty()){
+        LogMessage msg = std::move(log_queue.front());
+        log_queue.pop();
+        lock.unlock();
+        
+        processLog(msg);
+        
+        lock.lock();
+    }
+}
+
+void Logger::processLog(const LogMessage& msg){
+    if(msg.level < current_level){
+        return;
+    }
+    
+    std::ostringstream log_stream;
+    log_stream << "[" << getCurrentTime(msg.timestamp) << "] "
+               << "[" << logLevelToString(msg.level) << "] "
+               << "[TID:" << msg.thread_id << "] "
+               << msg.message;
+    
+    if(!msg.file.empty() && msg.line > 0){
+        size_t pos = msg.file.find_last_of("/\\");
+        std::string filename = (pos != std::string::npos) ? msg.file.substr(pos + 1) : msg.file;
+        log_stream << " (" << filename << ":" << msg.line << ")";
+    }
+    
+    std::string log_message = log_stream.str();
+    
+    if(console_output.load()){
+        std::cout << getColorCode(msg.level) << log_message << "\033[0m" << std::endl;
+    }
+    
+    if(file_output.load() && log_file.is_open()){
+        log_file << log_message << std::endl;
+        
+        if(msg.level == LogLevel::ERROR){
+            log_file.flush();
+        }
+    }
+}
+
+std::string Logger::getCurrentTime(const std::chrono::system_clock::time_point& tp){
+    auto time_t = std::chrono::system_clock::to_time_t(tp);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(tp.time_since_epoch()) % 1000;
     
     std::ostringstream oss;
     oss << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S");
@@ -50,23 +132,18 @@ std::string Logger::getColorCode(LogLevel level){
 }
 
 void Logger::setLogLevel(LogLevel level){
-    std::lock_guard<std::mutex> lock(log_mutex);
     current_level = level;
 }
 
 void Logger::setConsoleOutput(bool enable){
-    std::lock_guard<std::mutex> lock(log_mutex);
-    console_output = enable;
+    console_output.store(enable);
 }
 
 void Logger::setFileOutput(bool enable){
-    std::lock_guard<std::mutex> lock(log_mutex);
-    file_output = enable;
+    file_output.store(enable);
 }
 
 void Logger::setLogFile(const std::string& filename){
-    std::lock_guard<std::mutex> lock(log_mutex);
-
     std::filesystem::path path(filename);
     if(!path.parent_path().empty()){
         std::filesystem::create_directories(path.parent_path());
@@ -80,59 +157,49 @@ void Logger::setLogFile(const std::string& filename){
     log_file.open(filename, std::ios::app);
     if(!log_file.is_open()){
         std::cerr << "Failed to open log file: " << filename << std::endl;
-        file_output = false;
+        file_output.store(false);
     } 
     else{
-        file_output = true;
-        log_file << "\n========== New Session: " << getCurrentTime() << " ==========\n";
+        file_output.store(true);
+        log_file << "\n========== New Session: " 
+                 << getCurrentTime(std::chrono::system_clock::now()) 
+                 << " ==========\n";
         log_file.flush();
     }
 }
 
-void Logger::writeLog(LogLevel level, const std::string& message, const std::string& file, int line){
+void Logger::pushLog(LogLevel level, const std::string& message, const std::string& file, int line){
     if(level != current_level){
         return;
     }
     
-    std::lock_guard<std::mutex> lock(log_mutex);
+    LogMessage msg;
+    msg.level = level;
+    msg.message = message;
+    msg.file = file;
+    msg.line = line;
+    msg.timestamp = std::chrono::system_clock::now();
+    msg.thread_id = std::this_thread::get_id();
     
-    std::ostringstream log_stream;
-    
-    log_stream << "[" << getCurrentTime() << "] "
-               << "[" << logLevelToString(level) << "] "
-               << "[TID:" << std::this_thread::get_id() << "] "
-               << message;
-    
-    if(!file.empty() && line > 0){
-        size_t pos = file.find_last_of("/\\");
-        std::string filename = (pos != std::string::npos) ? file.substr(pos + 1) : file;
-        log_stream << " (" << filename << ":" << line << ")";
+    {
+        std::lock_guard<std::mutex> lock(queue_mutex);
+        log_queue.push(std::move(msg));
     }
-    
-    std::string log_message = log_stream.str();
-    
-    if(console_output){
-        std::cout << getColorCode(level) << log_message << "\033[0m" << std::endl;
-    }
-    
-    if(file_output && log_file.is_open()){
-        log_file << log_message << std::endl;
-        log_file.flush();
-    }
+    queue_cv.notify_one();
 }
 
 void Logger::debug(const std::string& message, const std::string& file, int line){
-    writeLog(LogLevel::DEBUG, message, file, line);
+    pushLog(LogLevel::DEBUG, message, file, line);
 }
 
 void Logger::info(const std::string& message, const std::string& file, int line){
-    writeLog(LogLevel::INFO, message, file, line);
+    pushLog(LogLevel::INFO, message, file, line);
 }
 
 void Logger::warning(const std::string& message, const std::string& file, int line){
-    writeLog(LogLevel::WARNING, message, file, line);
+    pushLog(LogLevel::WARNING, message, file, line);
 }
 
 void Logger::error(const std::string& message, const std::string& file, int line){
-    writeLog(LogLevel::ERROR, message, file, line);
+    pushLog(LogLevel::ERROR, message, file, line);
 }

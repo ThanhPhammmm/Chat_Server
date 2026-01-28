@@ -12,7 +12,7 @@ namespace Config {
 std::atomic<bool> g_shutdown_requested{false};
 
 void signalHandler(int signum){
-    (void)signum;  // Mark as used
+    (void)signum;
     g_shutdown_requested.store(true, std::memory_order_release);
 }
 
@@ -147,11 +147,12 @@ int main(){
         }
         
         // 10. GRACEFUL SHUTDOWN
+        LOG_DEBUG("Stopping server...");
         LOG_INFO("Initiating graceful shutdown...");
-
+        
         epoll_thread.stop();
         LOG_DEBUG("Epoll stopped");
-        
+
         router->stop();
         LOG_DEBUG("Router stopped");
         
@@ -174,9 +175,11 @@ int main(){
         LOG_DEBUG("Response Dispatcher stopped");
         
         server->stopServer();
-        LOG_DEBUG("TCP Server stopped");
+        LOG_INFO("Clean shutdown complete");
 
-        LOG_INFO("Stopping server...");
+        // Flush remaining logs
+        logger.flush();
+
         LOG_INFO("Server stopped");
     } 
     catch(const std::exception& e){

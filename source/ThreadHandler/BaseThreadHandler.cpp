@@ -29,11 +29,6 @@ void BaseThreadHandler::stop(){
     }
     
     if(worker_thread.joinable()){
-        if(std::this_thread::get_id() != worker_thread.get_id()){
-            worker_thread.join();
-        } 
-        else{
-            worker_thread.detach();
-        }
+        worker_thread.join();
     }
 }

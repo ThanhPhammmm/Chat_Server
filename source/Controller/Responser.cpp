@@ -16,7 +16,9 @@ void Responser::start(){
 
 void Responser::stop(){
     running.store(false);
-    response_queue->stop();
+    if(response_queue){
+        response_queue->stop();
+    }
     if(worker_thread.joinable()){
         worker_thread.join();
     }

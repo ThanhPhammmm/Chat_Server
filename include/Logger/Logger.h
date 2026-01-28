@@ -9,12 +9,24 @@
 #include <iostream>
 #include <thread>
 #include <filesystem>
+#include <queue>
+#include <condition_variable>
+#include <atomic>
 
 enum class LogLevel{
     DEBUG,
     INFO,
     WARNING,
     ERROR
+};
+
+struct LogMessage{
+    LogLevel level;
+    std::string message;
+    std::string file;
+    int line;
+    std::chrono::system_clock::time_point timestamp;
+    std::thread::id thread_id;
 };
 
 class Logger{
@@ -26,10 +38,21 @@ public:
     void setFileOutput(bool enable);
     void setLogFile(const std::string& filename);
 
-    void debug(const std::string& message, const std::string& file = "", int line = 0);
-    void info(const std::string& message, const std::string& file = "", int line = 0);
-    void warning(const std::string& message, const std::string& file = "", int line = 0);
-    void error(const std::string& message, const std::string& file = "", int line = 0);
+    void debug(const std::string& message,
+               const std::string& file = "", 
+               int line = 0);
+    void info(const std::string& message,
+              const std::string& file = "", 
+              int line = 0);
+    void warning(const std::string& message,
+                 const std::string& file = "", 
+                 int line = 0);
+    void error(const std::string& message,
+               const std::string& file = "", 
+               int line = 0);
+
+    void flush();
+    void stop();
 
 private:
     Logger();
@@ -38,16 +61,24 @@ private:
     Logger(const Logger&) = delete;
     Logger& operator=(const Logger&) = delete;
 
-    std::string getCurrentTime();
+    std::string getCurrentTime(const std::chrono::system_clock::time_point& tp);
     std::string logLevelToString(LogLevel level);
     std::string getColorCode(LogLevel level);
-    void writeLog(LogLevel level, const std::string& message, const std::string& file, int line);
+    void processLog(const LogMessage& msg);
+    void workerThread();
+    
+    void pushLog(LogLevel level, const std::string& message,const std::string& file, int line);
 
     std::ofstream log_file;
-    std::mutex log_mutex;
+    std::queue<LogMessage> log_queue;
+    std::mutex queue_mutex;
+    std::condition_variable queue_cv;
+    std::atomic<bool> running{true};
+    std::thread worker;
+    
     LogLevel current_level;
-    bool console_output;
-    bool file_output;
+    std::atomic<bool> console_output{true};
+    std::atomic<bool> file_output{true};
 };
 
 #define LOG_DEBUG(msg) \

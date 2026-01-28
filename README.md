@@ -1,6 +1,9 @@
 Improvement:
--Login with user name, for indentity
+-Login with user name, password, for indentity
+-Logout
+-Register new users with their name, password
+-Check authentication of a user
+-Save to database?
 
 BUG:
--When clients send /private_chat => Segmentation fault (core dumped)
--Can not close server gracefully
+-Now it is free

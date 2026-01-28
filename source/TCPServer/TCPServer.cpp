@@ -158,11 +158,8 @@ void TCPServer::startServer(){
 
 void TCPServer::stopServer(){
     if(listen_fd >= 0){
-        LOG_DEBUG_STREAM(listen_fd);
         epoll_instance->removeFd(listen_fd);
-        LOG_DEBUG_STREAM(listen_fd);
         close(listen_fd);
-        LOG_DEBUG_STREAM(listen_fd);
         listen_fd = -1;
     }
 }

@@ -10,6 +10,9 @@ std::string PrivateChatHandler::handleMessage(ConnectionPtr conn, CommandPtr com
     if(!epoll_instance){
         return "Error: Server error - no epoll instance";
     }
+    if((command->args).size() <= 1){
+        return "Error: Command is fault, check the command list again";
+    }
 
     int received_fd = std::stoi(command->args[0]);
 

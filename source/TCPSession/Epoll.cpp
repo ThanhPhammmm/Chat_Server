@@ -85,7 +85,7 @@ void EpollInstance::removeFd(int fd){
     if(conn && !conn->isClosed()){
         conn->close();
     }
-    LOG_DEBUG_STREAM("clent disconnected fd =" << fd);
+    LOG_DEBUG_STREAM("Clent disconnected fd =" << fd);
     LOG_INFO_STREAM("Client disconnected fd=" << fd);
 }
 

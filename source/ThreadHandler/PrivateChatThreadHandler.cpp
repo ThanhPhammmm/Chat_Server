@@ -37,7 +37,7 @@ void PrivateChatThreadHandler::run(){
                                ResponseDestination::DIRECT_TO_CLIENT;
             resp->exclude_fd = -1;
             resp->user_destination = req->user_desntination;
-            LOG_DEBUG("PrivateChat from" + std::to_string(resp->fd) + "to" + std::to_string(resp->user_destination));
+            LOG_DEBUG("PrivateChat from " + std::to_string(resp->fd) + " to " + std::to_string(resp->user_destination));
 
             if(running.load()){
                 response_queue->push(resp);

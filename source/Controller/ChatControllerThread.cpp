@@ -104,7 +104,7 @@ void ChatControllerThread::routeMessage(IncomingMessage& incoming, CommandParser
     req->command = cmd;
     req->fd = incoming.fd;
     req->request_id = request_counter.fetch_add(1);
-    if(cmd->type == CommandType::PRIVATE_CHAT){
+    if(cmd->type == CommandType::PRIVATE_CHAT && (cmd->args).size() > 1){
         req->user_desntination = std::stoi(cmd->args[0]);
     }
     else req->user_desntination = -1;

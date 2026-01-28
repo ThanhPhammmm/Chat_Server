@@ -30,11 +30,14 @@ void Logger::stop(){
 }
 
 void Logger::flush(){
-    LOG_DEBUG("HI1");
+    if(!running.load()){
+        return;  // Don't wait if worker already stopped
+    }
+    
     std::unique_lock<std::mutex> lock(queue_mutex);
-    LOG_DEBUG("HI2");
-    queue_cv.wait(lock, [this]{ return log_queue.empty(); });
-    LOG_DEBUG("HI3");
+    queue_cv.wait_for(lock, std::chrono::seconds(2), [this]{ 
+        return log_queue.empty() || !running.load(); 
+    });
 }
 
 void Logger::workerThread(){

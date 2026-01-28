@@ -150,6 +150,9 @@ int main(){
         LOG_DEBUG("Stopping server...");
         LOG_INFO("Initiating graceful shutdown...");
         
+        server->stopServer();
+        LOG_DEBUG("Server stopped");
+
         epoll_thread.stop();
         LOG_DEBUG("Epoll stopped");
 
@@ -173,14 +176,13 @@ int main(){
 
         response_dispatcher->stop();
         LOG_DEBUG("Response Dispatcher stopped");
-        
-        server->stopServer();
-        LOG_INFO("Clean shutdown complete");
-
-        // Flush remaining logs
-        logger.flush();
 
         LOG_INFO("Server stopped");
+        
+        // Flush remaining logs
+        logger.flush();
+        logger.stop();
+
     } 
     catch(const std::exception& e){
         LOG_ERROR_STREAM("Fatal error: " << e.what());

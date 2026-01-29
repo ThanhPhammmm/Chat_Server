@@ -9,6 +9,7 @@
 #include <stdint.h>
 
 enum class CommandType{
+    REGISTER, 
     LOGIN,
     LOGOUT,
     PUBLIC_CHAT,

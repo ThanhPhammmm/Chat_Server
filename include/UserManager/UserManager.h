@@ -1,0 +1,30 @@
+#pragma once
+
+#include <string>
+#include <unordered_map>
+#include <mutex>
+#include <optional>
+#include <vector>
+
+class UserManager{
+    private:
+        std::unordered_map<int, std::string> fd_to_username;
+        std::unordered_map<std::string, int> username_to_fd;
+        std::mutex user_mutex;
+        
+    public:
+        UserManager() = default;
+        ~UserManager() = default;
+        
+        static UserManager& getInstance();
+        
+        void loginUser(int fd, const std::string& username);
+        void logoutUser(int fd);
+        
+        std::optional<std::string> getUsername(int fd);
+        std::optional<int> getFd(const std::string& username);
+        bool isLoggedIn(int fd);
+        bool isUsernameLoggedIn(const std::string& username);
+        
+        std::vector<std::pair<int, std::string>> getAllLoggedInUsers();
+};

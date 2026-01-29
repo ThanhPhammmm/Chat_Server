@@ -36,6 +36,9 @@
 #include "LeavePublicChatRoomThreadHandler.h"
 #include "PrivateChatHandler.h"
 #include "PrivateChatThreadHandler.h"
+#include "RegisterAccountThreadHandler.h"
+#include "RegisterAccountHandler.h"
+#include "DataBaseThread.h"
 
 #define BUFFER_SIZE 4096
 #define MAX_EVENTS 1024

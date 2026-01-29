@@ -9,13 +9,16 @@ INCLUDES = \
 	-Iinclude/ThreadHandler \
 	-Iinclude/MessageThreadHandler \
 	-Iinclude/Logger \
-	-Iinclude/PublicChatRoom
+	-Iinclude/PublicChatRoom \
+	-Iinclude/DataBaseManager \
+	-Iinclude/UserManager
 
 RUN_DIR = RunProgram
 
 SERVER_TARGET = $(RUN_DIR)/chat_server
 CLIENT_TARGET = $(RUN_DIR)/chat_client
-LOGGER_TARGET = $(RUN_DIR)/Record
+LOGGER_TARGET = ./Record
+DATABASE_TARGET = ./DataBase
 
 SERVER_SRCS = \
 	source/main.cpp \
@@ -26,7 +29,9 @@ SERVER_SRCS = \
 	source/MessageHandler/*.cpp \
 	source/ThreadHandler/*.cpp \
 	source/Logger/*.cpp \
-	source/PublicChatRoom/*.cpp
+	source/PublicChatRoom/*.cpp \
+	source/DataBaseManager/*.cpp \
+	source/UserManager/*.cpp
 
 CLIENT_SRCS = source/Client/client.cpp
 
@@ -34,7 +39,7 @@ all: server client
 
 server:
 	@mkdir -p $(RUN_DIR)
-	$(CXX) $(CXXFLAGS) $(INCLUDES) $(SERVER_SRCS) -o $(SERVER_TARGET)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(SERVER_SRCS) -o $(SERVER_TARGET) -lsqlite3 -lcrypto
 
 client:
 	@mkdir -p $(RUN_DIR)
@@ -47,5 +52,5 @@ run-client: client
 	./$(CLIENT_TARGET)
 
 clean:
-	rm -rf $(SERVER_TARGET) $(CLIENT_TARGET) $(LOGGER_TARGET)
+	rm -rf $(SERVER_TARGET) $(CLIENT_TARGET) $(LOGGER_TARGET) $(DATABASE_TARGET)
 

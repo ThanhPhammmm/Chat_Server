@@ -43,9 +43,12 @@ CommandPtr CommandParser::parse(std::string& message, IncomingMessage& incomming
         cmd->args.push_back(arg);
     }
 
-    if(command_name == "/login"){
+    if(command_name == "/register"){
+        cmd->type = CommandType::REGISTER;
+    }
+    else if(command_name == "/login"){
         cmd->type = CommandType::LOGIN;
-    } 
+    }
     else if(command_name == "/logout"){
         cmd->type = CommandType::LOGOUT;
     } 

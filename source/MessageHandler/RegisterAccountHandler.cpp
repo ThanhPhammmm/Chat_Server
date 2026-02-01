@@ -4,6 +4,8 @@
 RegisterAccountHandler::RegisterAccountHandler(DataBaseThreadPtr db_thread) : db_thread(db_thread) {}
 
 std::string RegisterAccountHandler::handleMessage(ConnectionPtr conn, CommandPtr command, EpollInstancePtr epoll_instance){
+    (void)epoll_instance;
+
     if(!conn || conn->isClosed()){
         return "Error: Invalid connection";
     }
@@ -33,8 +35,9 @@ std::string RegisterAccountHandler::handleMessage(ConnectionPtr conn, CommandPtr
     req->username = username;
     req->password = password;
     req->fd = conn->getFd();
-    req->callback = [&](bool success, const std::string& msg){
+    req->callback = [&](bool success, std::string& msg){
         std::lock_guard<std::mutex> lock(result_mutex);
+        (void)success;
         result = msg;
         done = true;
         result_cv.notify_one();

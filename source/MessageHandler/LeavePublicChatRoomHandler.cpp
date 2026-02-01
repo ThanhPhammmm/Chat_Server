@@ -1,7 +1,11 @@
 #include "LeavePublicChatRoomHandler.h"
 #include "PublicChatRoom.h"
+#include "UserManager.h"
 
 std::string LeavePublicChatHandler::handleMessage(ConnectionPtr conn, CommandPtr command, EpollInstancePtr epoll_instance){
+    (void)epoll_instance;
+    (void)command;
+
     if(!conn || conn->isClosed()){
         return "Error: Invalid connection";
     }
@@ -18,6 +22,9 @@ std::string LeavePublicChatHandler::handleMessage(ConnectionPtr conn, CommandPtr
     }
     
     room.leave(fd);
-    
-    return "Left public chat room. Current Members: " + std::to_string(room.getParticipantsCount());
+
+    auto& userMgr = UserManager::getInstance();
+    std::string username = userMgr.getUsername(fd).value();
+
+    return username + " left public chat room. Current Members: " + std::to_string(room.getParticipantsCount());
 }

@@ -1,5 +1,6 @@
 #include "ChatControllerThread.h"
 #include "Logger.h"
+#include "UserManager.h"
 
 ChatControllerThread::ChatControllerThread(std::shared_ptr<MessageQueue<Message>> incoming_queue, EpollInstancePtr epoll_instance)
     : incoming_queue(incoming_queue),
@@ -83,12 +84,12 @@ void ChatControllerThread::routeMessage(IncomingMessage& incoming, CommandParser
         
         if(cmd->type == CommandType::UNKNOWN && incoming.connection && !incoming.connection->isClosed()){
             std::string error_msg = "Error: Unknown command. Available commands:\n"
+                                   "  /login <username>       - Login with username\n"
+                                   "  /logout                 - Logout\n"
                                    "  /join_public_chat_room  - Join public chat\n"
                                    "  /leave_public_chat_room - Leave public chat room\n"
-                                   "  /list_online_users     - List connected users\n"
-                                   "  /login <name>           - Login (not implemented)\n"
-                                   "  /logout                 - Logout (not implemented)\n"
-                                   "  /private_chat <user>    - Private message (not implemented)\n"
+                                   "  /list_online_users      - List all logged in users\n"
+                                   "  /private_chat <user> <msg> - Send private message\n"
                                    "  <message>               - Send to public chat (must join first)\n";
             
             int fd = incoming.fd;
@@ -104,10 +105,18 @@ void ChatControllerThread::routeMessage(IncomingMessage& incoming, CommandParser
     req->command = cmd;
     req->fd = incoming.fd;
     req->request_id = request_counter.fetch_add(1);
+
     if(cmd->type == CommandType::PRIVATE_CHAT && (cmd->args).size() > 1){
-        req->user_desntination = std::stoi(cmd->args[0]);
+        auto& userMgr = UserManager::getInstance();
+        auto target_fd = userMgr.getFd(cmd->args[0]);
+        if(target_fd.has_value()){
+            req->user_desntination = target_fd.value();
+        } 
+        else req->user_desntination = -1;
     }
-    else req->user_desntination = -1;
+    else {
+        req->user_desntination = -1;
+    }
     it->second->push(req);
     
     LOG_DEBUG_STREAM("[Router] Routed request #" << req->request_id << " to handler for type " << static_cast<int>(cmd->type));

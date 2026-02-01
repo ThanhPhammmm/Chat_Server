@@ -18,13 +18,13 @@ class UserManager{
         
         static UserManager& getInstance();
         
-        void loginUser(int fd, const std::string& username);
+        void loginUser(int fd, std::string& username);
         void logoutUser(int fd);
         
         std::optional<std::string> getUsername(int fd);
-        std::optional<int> getFd(const std::string& username);
+        std::optional<int> getFd(std::string& username);
         bool isLoggedIn(int fd);
-        bool isUsernameLoggedIn(const std::string& username);
+        bool isUsernameLoggedIn(std::string& username);
         
         std::vector<std::pair<int, std::string>> getAllLoggedInUsers();
 };

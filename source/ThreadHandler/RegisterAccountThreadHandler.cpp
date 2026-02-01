@@ -4,7 +4,7 @@
 RegisterAccountThreadHandler::RegisterAccountThreadHandler(std::shared_ptr<RegisterAccountHandler> handler,
                                                  std::shared_ptr<MessageQueue<HandlerRequestPtr>> req_queue,
                                                  std::shared_ptr<MessageQueue<HandlerResponsePtr>> resp_queue) 
-    : BaseThreadHandler(handler, req_queue, resp_queue, "PublicChatHandler"),
+    : BaseThreadHandler(handler, req_queue, resp_queue, "RegisterAccountHandler"),
       register_account_handler(handler) {}
 
 void RegisterAccountThreadHandler::run(){
@@ -41,5 +41,5 @@ void RegisterAccountThreadHandler::run(){
 
         }
     }
-    LOG_INFO_STREAM("[RegisterThreadHandler] Stopped");
+    LOG_INFO_STREAM("[RegisterAccountThreadHandler] Stopped");
 }

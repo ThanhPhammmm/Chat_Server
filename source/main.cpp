@@ -39,7 +39,7 @@ int main(){
     LOG_INFO_STREAM("Main Thread: " << std::this_thread::get_id());
 
     try{
-                // 0. START DATABASE THREAD
+        // 0. START DATABASE THREAD
         LOG_DEBUG("Starting database thread...");
         auto db_thread = std::make_shared<DataBaseThread>();
         db_thread->start();
@@ -57,6 +57,8 @@ int main(){
         LOG_DEBUG("Creating message queues...");
         auto to_incoming_queue = std::make_shared<MessageQueue<Message>>();
         auto to_register_queue = std::make_shared<MessageQueue<HandlerRequestPtr>>();
+        auto to_login_queue = std::make_shared<MessageQueue<HandlerRequestPtr>>();
+        auto to_logout_queue = std::make_shared<MessageQueue<HandlerRequestPtr>>();
         auto to_public_chat_room_queue = std::make_shared<MessageQueue<HandlerRequestPtr>>();
         auto to_list_users_queue = std::make_shared<MessageQueue<HandlerRequestPtr>>();
         auto to_join_public_chat_room_queue = std::make_shared<MessageQueue<HandlerRequestPtr>>();
@@ -68,6 +70,8 @@ int main(){
         // 3. CREATE HANDLERS
         LOG_DEBUG("Creating Handlers...");
         auto register_handler = std::make_shared<RegisterAccountHandler>(db_thread);
+        auto login_handler = std::make_shared<LoginChatHandler>(db_thread);
+        auto logout_handler = std::make_shared<LogoutChatHandler>();
         auto public_chat_room_handler = std::make_shared<PublicChatHandler>();        
         auto list_users_handler = std::make_shared<ListUsersHandler>();
         auto join_public_chat_room_handler = std::make_shared<JoinPublicChatHandler>();
@@ -78,6 +82,8 @@ int main(){
         // 4. CREATE HANDLER THREADS
         LOG_DEBUG("Creating Threads Handlers...");
         auto register_thread = std::make_shared<RegisterAccountThreadHandler>(register_handler, to_register_queue, to_response_queue);
+        auto login_thread = std::make_shared<LoginChatThreadHandler>(login_handler, to_login_queue, to_response_queue);
+        auto logout_thread = std::make_shared<LogoutChatThreadHandler>(logout_handler, to_logout_queue, to_response_queue);
         auto public_chat_room_thread = std::make_shared<PublicChatThreadHandler>(public_chat_room_handler, to_public_chat_room_queue, to_response_queue);
         auto list_users_thread = std::make_shared<ListUsersThreadHandler>(list_users_handler, to_list_users_queue, to_response_queue, epoll_instance);
         auto join_public_chat_room_thread = std::make_shared<JoinPublicChatThreadHandler>(join_public_chat_room_handler, to_join_public_chat_room_queue, to_response_queue);
@@ -88,6 +94,8 @@ int main(){
         LOG_DEBUG("Creating ChatControllerThread...");
         auto router = std::make_shared<ChatControllerThread>(to_incoming_queue, epoll_instance);
         router->registerHandlerQueue(CommandType::REGISTER, to_register_queue);
+        router->registerHandlerQueue(CommandType::LOGIN, to_login_queue);
+        router->registerHandlerQueue(CommandType::LOGOUT, to_logout_queue);
         router->registerHandlerQueue(CommandType::PUBLIC_CHAT, to_public_chat_room_queue);
         router->registerHandlerQueue(CommandType::LIST_ONLINE_USERS, to_list_users_queue);
         router->registerHandlerQueue(CommandType::JOIN_PUBLIC_CHAT_ROOM, to_join_public_chat_room_queue);
@@ -116,6 +124,8 @@ int main(){
         // 8. START ALL THREADS
         LOG_DEBUG("Starting worker threads...");
         register_thread->start();
+        login_thread->start();
+        logout_thread->start();
         public_chat_room_thread->start();
         list_users_thread->start();
         join_public_chat_room_thread->start();        
@@ -172,6 +182,12 @@ int main(){
 
         register_thread->stop();
         LOG_DEBUG("RegisterThreadHandler stopped");
+
+        login_thread->stop();
+        LOG_DEBUG("LoginThreadHandler stopped");
+        
+        logout_thread->stop();
+        LOG_DEBUG("LogoutThreadHandler stopped");
 
         public_chat_room_thread->stop();
         LOG_DEBUG("PublicChatThreadHandler stopped");

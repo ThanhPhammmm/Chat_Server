@@ -21,7 +21,7 @@ struct DBRequest{
     std::string password;
     int fd;
     int request_id;
-    std::function<void(bool, const std::string&)> callback;
+    std::function<void(bool success, std::string&)> callback;
 };
 
 using DBRequestPtr = std::shared_ptr<DBRequest>;

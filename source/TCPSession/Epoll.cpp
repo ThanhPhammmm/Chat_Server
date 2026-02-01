@@ -1,5 +1,6 @@
 #include "Epoll.h"
 #include "Logger.h"
+#include "UserManager.h"
 
 EpollInstance::EpollInstance(){
     epfd = epoll_create1(0);
@@ -82,6 +83,9 @@ void EpollInstance::removeFd(int fd){
             connections.erase(it);
         }
     }
+
+    UserManager::getInstance().logoutUser(fd);
+
     if(conn && !conn->isClosed()){
         conn->close();
     }

@@ -1,7 +1,11 @@
 #include "JoinPublicChatRoomHandler.h"
 #include "PublicChatRoom.h"
+#include "UserManager.h"
 
 std::string JoinPublicChatHandler::handleMessage(ConnectionPtr conn, CommandPtr command, EpollInstancePtr epoll_instance){
+    (void)epoll_instance;
+    (void)command;
+
     if(!conn || conn->isClosed()){
         return "Error: Invalid connection";
     }
@@ -18,6 +22,9 @@ std::string JoinPublicChatHandler::handleMessage(ConnectionPtr conn, CommandPtr 
     };
 
     room.join(fd);
+        
+    auto& userMgr = UserManager::getInstance();
+    std::string username = userMgr.getUsername(fd).value();
 
-    return std::to_string(fd) + " joined Public Chat Room. Current Members: " + std::to_string(room.getParticipantsCount());
+    return username + " joined Public Chat Room. Current Members: " + std::to_string(room.getParticipantsCount());
 }

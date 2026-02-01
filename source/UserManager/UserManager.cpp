@@ -5,7 +5,7 @@ UserManager& UserManager::getInstance(){
     return instance;
 }
 
-void UserManager::loginUser(int fd, const std::string& username){
+void UserManager::loginUser(int fd, std::string& username){
     std::lock_guard<std::mutex> lock(user_mutex);
     
     fd_to_username[fd] = username;
@@ -31,7 +31,7 @@ std::optional<std::string> UserManager::getUsername(int fd){
     return std::nullopt;
 }
 
-std::optional<int> UserManager::getFd(const std::string& username){
+std::optional<int> UserManager::getFd(std::string& username){
     std::lock_guard<std::mutex> lock(user_mutex);
     auto it = username_to_fd.find(username);
     if(it != username_to_fd.end()){
@@ -45,7 +45,7 @@ bool UserManager::isLoggedIn(int fd){
     return fd_to_username.find(fd) != fd_to_username.end();
 }
 
-bool UserManager::isUsernameLoggedIn(const std::string& username){
+bool UserManager::isUsernameLoggedIn(std::string& username){
     std::lock_guard<std::mutex> lock(user_mutex);
     return username_to_fd.find(username) != username_to_fd.end();
 }

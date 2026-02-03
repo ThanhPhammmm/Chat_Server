@@ -1,0 +1,26 @@
+@startuml ChatServer_HandlerThreads
+
+abstract class BaseThreadHandler{
+  +start()
+  +stop()
+}
+
+class RegisterAccountThreadHandler
+class LoginChatThreadHandler
+class LogoutChatThreadHandler
+class PublicChatThreadHandler
+class PrivateChatThreadHandler
+class ListUsersThreadHandler
+class JoinPublicChatThreadHandler
+class LeavePublicChatThreadHandler
+
+BaseThreadHandler <|-- RegisterAccountThreadHandler
+BaseThreadHandler <|-- LoginChatThreadHandler
+BaseThreadHandler <|-- LogoutChatThreadHandler
+BaseThreadHandler <|-- PublicChatThreadHandler
+BaseThreadHandler <|-- PrivateChatThreadHandler
+BaseThreadHandler <|-- ListUsersThreadHandler
+BaseThreadHandler <|-- JoinPublicChatThreadHandler
+BaseThreadHandler <|-- LeavePublicChatThreadHandler
+
+@enduml

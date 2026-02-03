@@ -1,0 +1,18 @@
+@startuml ChatServer_Controller
+
+class ChatControllerThread
+class CommandParser
+class MessageQueue
+class EpollInstance
+class Responser
+class ThreadPool
+
+ChatControllerThread --> CommandParser : uses
+ChatControllerThread --> MessageQueue : consumes
+ChatControllerThread --> EpollInstance : uses
+
+Responser --> MessageQueue : consumes
+Responser --> ThreadPool : uses
+Responser --> EpollInstance : uses
+
+@enduml

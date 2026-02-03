@@ -1,0 +1,11 @@
+@startuml ChatServer_Logging
+
+enum LogLevel
+
+class LogMessage
+class Logger
+
+Logger --> LogMessage : processes
+Logger --> LogLevel
+
+@enduml

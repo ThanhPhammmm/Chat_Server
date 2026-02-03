@@ -1,0 +1,17 @@
+@startuml ChatServer_Networking
+
+class TCPServer
+class Connection
+class EpollInstance
+class EpollThread
+class ThreadPool
+
+TCPServer --> EpollInstance : uses
+TCPServer --> ThreadPool : uses
+TCPServer --> Connection : manages
+
+EpollInstance --> Connection : manages
+EpollThread --> EpollInstance : wraps
+Connection --> Clients: manages
+
+@enduml

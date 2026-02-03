@@ -1,0 +1,29 @@
+@startuml ChatServer_Protocol
+
+enum CommandType
+enum ResponseType
+enum ResponseDestination
+enum MessageType
+
+class Command{
+  +type : CommandType
+  +args
+}
+
+class IncomingMessage
+class Message{
+  +type : MessageType
+}
+
+class HandlerRequest
+class HandlerResponse
+
+class CommandParser
+
+Command --> CommandType
+Message --> MessageType
+HandlerResponse --> ResponseDestination
+
+CommandParser ..> Command : creates
+
+@enduml

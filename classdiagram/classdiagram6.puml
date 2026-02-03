@@ -1,0 +1,16 @@
+@startuml ChatServer_State
+
+class User
+class UserManager
+class PublicChatRoom
+
+class DataBaseThread
+class DataBaseManager
+
+UserManager --> User : manages
+PublicChatRoom --> UserManager : queries
+
+DataBaseThread --> DataBaseManager : uses
+DataBaseManager --> User : persists
+
+@enduml

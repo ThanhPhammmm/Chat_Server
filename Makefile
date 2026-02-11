@@ -11,7 +11,8 @@ INCLUDES = \
 	-Iinclude/Logger \
 	-Iinclude/PublicChatRoom \
 	-Iinclude/DataBaseManager \
-	-Iinclude/UserManager
+	-Iinclude/UserManager \
+	-Iinclude/Utils
 
 RUN_DIR = RunProgram
 
@@ -31,7 +32,8 @@ SERVER_SRCS = \
 	source/Logger/*.cpp \
 	source/PublicChatRoom/*.cpp \
 	source/DataBaseManager/*.cpp \
-	source/UserManager/*.cpp
+	source/UserManager/*.cpp \
+	source/Utils/*.cpp
 
 CLIENT_SRCS = source/Client/client.cpp
 

@@ -1,0 +1,25 @@
+@startuml ChatServer_Handlers
+
+abstract class MessageHandler {
+  +handleMessage()
+}
+
+class RegisterAccountHandler
+class LoginChatHandler
+class LogoutChatHandler
+class PublicChatHandler
+class PrivateChatHandler
+class ListUsersHandler
+class JoinPublicChatHandler
+class LeavePublicChatHandler
+
+MessageHandler <|-- RegisterAccountHandler
+MessageHandler <|-- LoginChatHandler
+MessageHandler <|-- LogoutChatHandler
+MessageHandler <|-- PublicChatHandler
+MessageHandler <|-- PrivateChatHandler
+MessageHandler <|-- ListUsersHandler
+MessageHandler <|-- JoinPublicChatHandler
+MessageHandler <|-- LeavePublicChatHandler
+
+@enduml

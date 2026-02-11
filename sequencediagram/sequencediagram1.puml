@@ -1,0 +1,44 @@
+@startuml User Login Flow
+    Client->>TCPServer: connect()
+    TCPServer->>EpollInstance: addFd(fd, callback, conn)
+    EpollInstance-->>TCPServer: OK
+    
+    Client->>TCPServer: send("/login user pass")
+    TCPServer->>EpollInstance: EPOLLIN event
+    EpollInstance->>TCPServer: onRead(fd)
+    TCPServer->>TCPServer: recv() data
+    TCPServer->>ChatControllerThread: push IncomingMessage
+    
+    ChatControllerThread->>ChatControllerThread: pop from queue
+    ChatControllerThread->>ChatControllerThread: CommandParser::parse()
+    ChatControllerThread->>ChatControllerThread: create HandlerRequest
+    ChatControllerThread->>LoginChatThreadHandler: push to login_queue
+    
+    LoginChatThreadHandler->>LoginChatThreadHandler: pop from queue
+    LoginChatThreadHandler->>LoginChatHandler: handleMessage()
+    
+    LoginChatHandler->>UserManager: isLoggedIn(fd)?
+    UserManager-->>LoginChatHandler: false
+    
+    LoginChatHandler->>UserManager: isUsernameLoggedIn(username)?
+    UserManager-->>LoginChatHandler: false
+    
+    LoginChatHandler->>DataBaseThread: submitRequest(DBRequest)
+    DataBaseThread->>DataBaseThread: processRequest()
+    DataBaseThread->>DataBaseManager: verifyLogin(username, password)
+    DataBaseManager->>DataBaseManager: hashPassword()
+    DataBaseManager->>DataBaseManager: SELECT from users
+    DataBaseManager-->>DataBaseThread: verified=true
+    DataBaseThread->>DataBaseThread: callback(success, message)
+    
+    DataBaseThread->>LoginChatHandler: callback executed
+    LoginChatHandler->>UserManager: loginUser(fd, username)
+    UserManager-->>LoginChatHandler: OK
+    
+    LoginChatHandler-->>LoginChatThreadHandler: return "Success: Login successful"
+    LoginChatThreadHandler->>Resp: push HandlerResponse
+    
+    Responser->>Responser: pop from queue
+    Responser->>ThreadPool: submit send task
+    ThreadPool->>Client: send("Success: Login successful")
+@enduml

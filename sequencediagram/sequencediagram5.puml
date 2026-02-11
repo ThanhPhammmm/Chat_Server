@@ -1,0 +1,34 @@
+@startuml User Registration Flow
+    Client->>TCPServer: send("/register alice password123")
+    TCPServer->>ChatControllerThread: push IncomingMessage
+    
+    ChatControllerThread->>ChatControllerThread: CommandParser::parse()
+    ChatControllerThread->>RegisterAccountThreadHandler: push to register_queue
+    
+    RegisterAccountThreadHandler->>RegisterAccountHandler: handleMessage()
+    
+    RegisterAccountHandler->>RegisterAccountHandler: Validate username (3-20 chars)
+    RegisterAccountHandler->>RegisterAccountHandler: Validate password (min 6 chars)
+    RegisterAccountHandler->>RegisterAccountHandler: Regex check username
+    
+    RegisterAccountHandler->>DataBaseThread: submitRequest(DBRequest)
+    Note over RegisterAccountHandler: Wait on condition_variable
+    
+    DataBaseThread->>DataBaseThread: processRequest()
+    DataBaseThread->>DataBaseManager: usernameExists("alice")
+    DataBaseManager-->>DataBaseThread: false
+    
+    DataBaseThread->>DataBaseManager: registerUser("alice", "password123")
+    DataBaseManager->>DataBaseManager: hashPassword("password123")
+    Note over DataBaseManager: SHA256 hash
+    DataBaseManager->>DataBaseManager: INSERT INTO users
+    DataBaseManager-->>DataBaseThread: success=true
+    
+    DataBaseThread->>RegisterAccountHandler: callback(true, "Success: User registered")
+    Note over RegisterAccountHandler: Condition variable notified
+    
+    RegisterAccountHandler-->>RegisterAccountThreadHandler: "Success: User registered"
+    RegisterAccountThreadHandler->>Responser: push HandlerResponse
+    
+    Responser->>Client: send("Success: User registered")
+@enduml

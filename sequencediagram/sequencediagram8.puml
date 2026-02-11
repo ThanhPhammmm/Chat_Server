@@ -1,51 +1,53 @@
 @startuml Database Query Flow
-    Handler->>Handler: Create DBRequest
-    Note over Handler: Set type, username, password, callback function
+
+Handler->>Handler: Create DBRequest
+Note over Handler: Set type, username, password, callback function
+
+Handler->>DataBaseThread: submitRequest(DBRequest)
+DataBaseThread->>MessageQueueDBRequest: push(DBRequest)
+
+Handler->>Handler: Wait on condition_variable(timeout: 5s)
+
+DataBaseThread->>MessageQueueDBRequest: pop(timeout=100ms)
+MessageQueueDBRequest-->>DataBaseThread: DBRequest
+
+DataBaseThread->>DataBaseThread: processRequest(DBRequest)
+
+DataBaseThread->>DataBaseManager: Lock db_mutex
+
+alt Register User
+    DataBaseThread->>DataBaseManager: usernameExists(username)
+    DataBaseManager->>SQLiteDatabase: SELECT COUNT(*) FROM users WHERE username=?
+    SQLiteDatabase-->>DataBaseManager: count
+    DataBaseManager-->>DataBaseThread: exists
     
-    Handler->>DataBaseThread: submitRequest(DBRequest)
-    DataBaseThread->>MessageQueueDBRequest: push(DBRequest)
-    
-    Handler->>Handler: Wait on condition_variable(timeout: 5s)
-    
-    DataBaseThread->>MessageQueueDBRequest: pop(timeout=100ms)
-    MessageQueueDBRequest-->>DataBaseThread: DBRequest
-    
-    DataBaseThread->>DataBaseThread: processRequest(DBRequest)
-    
-    DataBaseThread->>DataBaseManager: Lock db_mutex
-    
-    alt Register User
-        DataBaseThread->>DataBaseManager: usernameExists(username)
-        DataBaseManager->>SQLiteDatabase: SELECT COUNT(*) FROM users WHERE username=?
-        SQLiteDatabase-->>DataBaseManager: count
-        DataBaseManager-->>DataBaseThread: exists
-        
-        opt If not exists
-            DataBaseThread->>DataBaseManager: registerUser(username, password)
-            DataBaseManager->>DataBaseManager: hashPassword(password)
-            DataBaseManager->>SQLiteDatabase: INSERT INTO users VALUES (?,?)
-            SQLiteDatabase-->>DataBaseManager: success
-        end
-        
-    else Verify Login
-        DataBaseThread->>DataBaseManager: verifyLogin(username, password)
+    opt If not exists
+        DataBaseThread->>DataBaseManager: registerUser(username, password)
         DataBaseManager->>DataBaseManager: hashPassword(password)
-        DataBaseManager->>SQLiteDatabase: SELECT password_hash FROM users WHERE username=?
-        SQLiteDatabase-->>DataBaseManager: stored_hash
-        DataBaseManager->>DataBaseManager: Compare hashes
-        DataBaseManager-->>DataBaseThread: verified
-        
-        opt If verified
-            DataBaseThread->>DataBaseManager: updateLastLogin(username)
-            DataBaseManager->>SQLiteDatabase: UPDATE users SET last_login=CURRENT_TIMESTAMP WHERE username=?
-        end
+        DataBaseManager->>SQLiteDatabase: INSERT INTO users VALUES (?,?)
+        SQLiteDatabase-->>DataBaseManager: success
     end
     
-    DataBaseThread->>DataBaseManager: Unlock db_mutex
+else Verify Login
+    DataBaseThread->>DataBaseManager: verifyLogin(username, password)
+    DataBaseManager->>DataBaseManager: hashPassword(password)
+    DataBaseManager->>SQLiteDatabase: SELECT password_hash FROM users WHERE username=?
+    SQLiteDatabase-->>DataBaseManager: stored_hash
+    DataBaseManager->>DataBaseManager: Compare hashes
+    DataBaseManager-->>DataBaseThread: verified
     
-    DataBaseThread->>Handler: callback(success, message)
-    Handler->>Handler: Notify condition_variable
-    Handler->>Handler: Wake up from wait
-    
-    Handler-->>Handler: Return result
+    opt If verified
+        DataBaseThread->>DataBaseManager: updateLastLogin(username)
+        DataBaseManager->>SQLiteDatabase: UPDATE users SET last_login=CURRENT_TIMESTAMP WHERE username=?
+    end
+end
+
+DataBaseThread->>DataBaseManager: Unlock db_mutex
+
+DataBaseThread->>Handler: callback(success, message)
+Handler->>Handler: Notify condition_variable
+Handler->>Handler: Wake up from wait
+
+Handler-->>Handler: Return result
+
 @enduml

@@ -1,34 +1,36 @@
 @startuml Private Message Flow
-    Client1->>TCPServer: send("/private_chat Bob Hi there")
-    TCPServer->>ChatControllerThread: push IncomingMessage
-    
-    ChatControllerThread->>ChatControllerThread: CommandParser::parse()
-    Note over ChatControllerThread: args[0]="Bob", args[1]="Hi", args[2]="there"
-    
-    ChatControllerThread->>UserManager: getFd("Bob")
-    UserManager-->>ChatControllerThread: fd=5(assume)
-    Note over ChatControllerThread: Set req->user_destination=5
-    
-    ChatControllerThread->>PrivateChatThreadHandler: push to private_chat_queue
-    
-    PrivateChatThreadHandler->>PrivateChatHandler: handleMessage()
-    
-    PrivateChatHandler->>UserManager: isLoggedIn(sender_fd)?
-    UserManager-->>PrivateChatHandler: true
-    
-    PrivateChatHandler->>UserManager: getFd("Bob")
-    UserManager-->>PrivateChatHandler: fd=5
-    
-    PrivateChatHandler->>EpollInstance: isEpollMember(5)?
-    EpollInstance-->>PrivateChatHandler: true
-    
-    PrivateChatHandler->>UserManager: getUsername(sender_fd)
-    UserManager-->>PrivateChatHandler: "Alice"
-    
-    PrivateChatHandler-->>PrivateChatThreadHandler: "[Private from Alice]: Hi there"
-    
-    PrivateChatThreadHandler->>Responser: push HandlerResponse(destination=DIRECT_TO_CLIENT, user_destination=5)
-    
-    Responser->>ThreadPool: submit send task (fd=5)
-    ThreadPool->>Client2: send("[Private from Alice]: Hi there")
+
+Client1->>TCPServer: send("/private_chat Bob Hi there")
+TCPServer->>ChatControllerThread: push IncomingMessage
+
+ChatControllerThread->>ChatControllerThread: CommandParser::parse()
+Note over ChatControllerThread: args[0]="Bob", args[1]="Hi", args[2]="there"
+
+ChatControllerThread->>UserManager: getFd("Bob")
+UserManager-->>ChatControllerThread: fd=5(assume)
+Note over ChatControllerThread: Set req->user_destination=5
+
+ChatControllerThread->>PrivateChatThreadHandler: push to private_chat_queue
+
+PrivateChatThreadHandler->>PrivateChatHandler: handleMessage()
+
+PrivateChatHandler->>UserManager: isLoggedIn(sender_fd)?
+UserManager-->>PrivateChatHandler: true
+
+PrivateChatHandler->>UserManager: getFd("Bob")
+UserManager-->>PrivateChatHandler: fd=5
+
+PrivateChatHandler->>EpollInstance: isEpollMember(5)?
+EpollInstance-->>PrivateChatHandler: true
+
+PrivateChatHandler->>UserManager: getUsername(sender_fd)
+UserManager-->>PrivateChatHandler: "Alice"
+
+PrivateChatHandler-->>PrivateChatThreadHandler: "[Private from Alice]: Hi there"
+
+PrivateChatThreadHandler->>Responser: push HandlerResponse(destination=DIRECT_TO_CLIENT, user_destination=5)
+
+Responser->>ThreadPool: submit send task (fd=5)
+ThreadPool->>Client2: send("[Private from Alice]: Hi there")
+
 @enduml

@@ -1,48 +1,50 @@
 @startuml Graceful Shutdown Flow
-    SignInt->>MainThread: SignInt received
-    MainThread->>MainThread: g_shutdown_requested = true
-    MainThread->>MainThread: Exit monitor loop
+
+SignInt->>MainThread: SignInt received
+MainThread->>MainThread: g_shutdown_requested = true
+MainThread->>MainThread: Exit monitor loop
+
+MainThread->>TCPServer: stopServer()
+TCPServer->>EpollThread: removeFd(listen_fd)
+TCPServer->>TCPServer: close(listen_fd)
+
+MainThread->>EpollThread: stop()
+EpollThread->>EpollThread: should_stop = true
+EpollThread->>EpollThread: Exit epoll_wait loop
+EpollThread->>EpollThread: Join worker thread
+
+MainThread->>ChatControllerThread: stop()
+ChatControllerThread->>ChatControllerThread: running = false
+ChatControllerThread->>ChatControllerThread: incoming_queue->stop()
+ChatControllerThread->>ChatControllerThread: Join worker thread
+
+par Stop all Thread Handlers
+    MainThread->>ThreadHandlers: register_thread->stop()
+    ThreadHandlers->>ThreadHandlers: running = false
+    ThreadHandlers->>ThreadHandlers: request_queue->stop()
+    ThreadHandlers->>ThreadHandlers: Join worker thread
     
-    MainThread->>TCPServer: stopServer()
-    TCPServer->>EpollThread: removeFd(listen_fd)
-    TCPServer->>TCPServer: close(listen_fd)
-    
-    MainThread->>EpollThread: stop()
-    EpollThread->>EpollThread: should_stop = true
-    EpollThread->>EpollThread: Exit epoll_wait loop
-    EpollThread->>EpollThread: Join worker thread
-    
-    MainThread->>ChatControllerThread: stop()
-    ChatControllerThread->>ChatControllerThread: running = false
-    ChatControllerThread->>ChatControllerThread: incoming_queue->stop()
-    ChatControllerThread->>ChatControllerThread: Join worker thread
-    
-    par Stop all Thread Handlers
-        MainThread->>ThreadHandlers: register_thread->stop()
-        ThreadHandlers->>ThreadHandlers: running = false
-        ThreadHandlers->>ThreadHandlers: request_queue->stop()
-        ThreadHandlers->>ThreadHandlers: Join worker thread
-        
-        Note over Main,TH: Repeat for all 8 handlers
-    end
-    
-    MainThread->>Responser: stop()
-    Responser->>Responser: running = false
-    Responser->>Responser: response_queue->stop()
-    Responser->>Responser: Join worker thread
-    
-    MainThread->>DataBaseThread: stop()
-    DataBaseThread->>DataBaseThread: running = false
-    DataBaseThread->>DataBaseThread: request_queue->stop()
-    DataBaseThread->>DataBaseThread: Join worker thread
-    
-    MainThread->>Logger: flush()
-    Logger->>Logger: Wait for queue empty
-    
-    MainThread->>Logger: stop()
-    Logger->>Logger: running = false
-    Logger->>Logger: Notify worker
-    Logger->>Logger: Join worker thread
-    
-    MainThread-->>MainThread: Cleanup complete<br/>Exit(0)
+    Note over Main,TH: Repeat for all 8 handlers
+end
+
+MainThread->>Responser: stop()
+Responser->>Responser: running = false
+Responser->>Responser: response_queue->stop()
+Responser->>Responser: Join worker thread
+
+MainThread->>DataBaseThread: stop()
+DataBaseThread->>DataBaseThread: running = false
+DataBaseThread->>DataBaseThread: request_queue->stop()
+DataBaseThread->>DataBaseThread: Join worker thread
+
+MainThread->>Logger: flush()
+Logger->>Logger: Wait for queue empty
+
+MainThread->>Logger: stop()
+Logger->>Logger: running = false
+Logger->>Logger: Notify worker
+Logger->>Logger: Join worker thread
+
+MainThread-->>MainThread: Cleanup complete
+
 @enduml

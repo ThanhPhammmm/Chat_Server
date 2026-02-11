@@ -1,35 +1,37 @@
 @startuml Connection Lost Handling
-    Client->>Client: Connection lost(network error)
-    
-    EpollInstance->>EpollInstance: epoll_wait() returns EPOLLHUP | EPOLLERR
-    
-    EpollInstance->>EpollInstance: removeFd(fd)
-    EpollInstance->>EpollInstance: epoll_ctl(EPOLL_CTL_DEL)
-    
-    EpollInstance->>EpollInstance: Lock handlers_mutex
-    EpollInstance->>EpollInstance: handlers.erase(fd)
-    EpollInstance->>EpollInstance: epoll_fds.erase(fd)
-    
-    EpollInstance->>Connection: Get Connection from map
-    EpollInstance->>EpollInstance: connections.erase(fd)
-    EpollInstance->>EpollInstance: Unlock handlers_mutex
-    
-    EpollInstance->>UserManager: logoutUser(fd)
-    UserManager->>UserManager: Lock user_mutex
-    UserManager->>UserManager: username = fd_to_username[fd]
-    UserManager->>UserManager: fd_to_username.erase(fd)
-    UserManager->>UserManager: username_to_fd.erase(username)
-    UserManager->>UserManager: Unlock user_mutex
-    
-    EpollInstance->>Connection: isClosed()?
-    Connection-->>EpollInstance: false
-    
-    EpollInstance->>Connection: close()
-    Connection->>Connection: Lock close_mutex
-    Connection->>Connection: closed = true
-    Connection->>Connection: shutdown(fd, SHUT_RDWR)
-    Connection->>Connection: ::close(fd)
-    Connection->>Connection: Unlock close_mutex
-    
-    Note over EpollInstance: Log: Client disconnected fd=X
+
+Client->>Client: Connection lost(network error)
+
+EpollInstance->>EpollInstance: epoll_wait() returns EPOLLHUP | EPOLLERR
+
+EpollInstance->>EpollInstance: removeFd(fd)
+EpollInstance->>EpollInstance: epoll_ctl(EPOLL_CTL_DEL)
+
+EpollInstance->>EpollInstance: Lock handlers_mutex
+EpollInstance->>EpollInstance: handlers.erase(fd)
+EpollInstance->>EpollInstance: epoll_fds.erase(fd)
+
+EpollInstance->>Connection: Get Connection from map
+EpollInstance->>EpollInstance: connections.erase(fd)
+EpollInstance->>EpollInstance: Unlock handlers_mutex
+
+EpollInstance->>UserManager: logoutUser(fd)
+UserManager->>UserManager: Lock user_mutex
+UserManager->>UserManager: username = fd_to_username[fd]
+UserManager->>UserManager: fd_to_username.erase(fd)
+UserManager->>UserManager: username_to_fd.erase(username)
+UserManager->>UserManager: Unlock user_mutex
+
+EpollInstance->>Connection: isClosed()?
+Connection-->>EpollInstance: false
+
+EpollInstance->>Connection: close()
+Connection->>Connection: Lock close_mutex
+Connection->>Connection: closed = true
+Connection->>Connection: shutdown(fd, SHUT_RDWR)
+Connection->>Connection: ::close(fd)
+Connection->>Connection: Unlock close_mutex
+
+Note over EpollInstance: Log: Client disconnected fd=X
+
 @enduml

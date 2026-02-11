@@ -1,38 +1,39 @@
 @startuml Public Chat Message Flow
 
-    Client1->>TCPServer: send("Hello everyone")
-    TCPServer->>ChatControllerThread: push IncomingMessage
+Client1->>TCPServer: send("Hello everyone")
+TCPServer->>ChatControllerThread: push IncomingMessage
+
+ChatControllerThread->>ChatControllerThread: CommandParser::parse()
+Note over ChatControllerThread: Detects no '/' → PUBLIC_CHAT
+ChatControllerThread->>PublicChatThreadHandler: push to public_chat_queue
+
+PublicChatThreadHandler->>PublicChatHandler: handleMessage()
+
+PublicChatHandler->>UserManager: isLoggedIn(fd)?
+UserManager-->>PublicChatHandler: true
+
+PublicChatHandler->>PublicChatRoom: isParticipant(fd)?
+PublicChatRoom-->>PublicChatHandler: true
+
+PublicChatHandler->>UserManager: getUsername(fd)
+UserManager-->>PublicChatHandler: "Alice"
+
+PublicChatHandler-->>PublicChatThreadHandler: "[Public] Alice: Hello everyone"
+
+PublicChatThreadHandler->>Resp: push HandlerResponse<br/>(destination=BROADCAST)
+
+Responser->>PublicChatRoom: getParticipants()
+PublicChatRoom-->>Responser: [fd1, fd2, fd3]
+
+par Broadcast to all participants
+    Responser->>ThreadPool: submit send task (fd1)
+    ThreadPool->>Client1: send("[Public] Alice: Hello everyone")
     
-    ChatControllerThread->>ChatControllerThread: CommandParser::parse()
-    Note over ChatControllerThread: Detects no '/' → PUBLIC_CHAT
-    ChatControllerThread->>PublicChatThreadHandler: push to public_chat_queue
+    Responser->>ThreadPool: submit send task (fd2)
+    ThreadPool->>Client1: send("[Public] Alice: Hello everyone")
     
-    PublicChatThreadHandler->>PublicChatHandler: handleMessage()
-    
-    PublicChatHandler->>UserManager: isLoggedIn(fd)?
-    UserManager-->>PublicChatHandler: true
-    
-    PublicChatHandler->>PublicChatRoom: isParticipant(fd)?
-    PublicChatRoom-->>PublicChatHandler: true
-    
-    PublicChatHandler->>UserManager: getUsername(fd)
-    UserManager-->>PublicChatHandler: "Alice"
-    
-    PublicChatHandler-->>PublicChatThreadHandler: "[Public] Alice: Hello everyone"
-    
-    PublicChatThreadHandler->>Resp: push HandlerResponse<br/>(destination=BROADCAST)
-    
-    Responser->>PublicChatRoom: getParticipants()
-    PublicChatRoom-->>Responser: [fd1, fd2, fd3]
-    
-    par Broadcast to all participants
-        Responser->>ThreadPool: submit send task (fd1)
-        ThreadPool->>Client1: send("[Public] Alice: Hello everyone")
-        
-        Responser->>ThreadPool: submit send task (fd2)
-        ThreadPool->>Client1: send("[Public] Alice: Hello everyone")
-        
-        Responser->>ThreadPool: submit send task (fd3)
-        ThreadPool->>Client3: send("[Public] Alice: Hello everyone")
-    end
+    Responser->>ThreadPool: submit send task (fd3)
+    ThreadPool->>Client3: send("[Public] Alice: Hello everyone")
+end
+
 @enduml

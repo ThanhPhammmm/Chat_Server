@@ -1,36 +1,38 @@
 @startuml Join Public Chat Room Flow
-    Client->>TCPServer: send("/join_public_chat_room")
-    TCPServer->>ChatControllerThread: push IncomingMessage
+
+Client->>TCPServer: send("/join_public_chat_room")
+TCPServer->>ChatControllerThread: push IncomingMessage
+
+ChatControllerThread->>ChatControllerThread: CommandParser::parse()
+ChatControllerThread->>JoinPublicChatThreadHandler: push to join_queue
+
+JoinPublicChatThreadHandler->>JoinPublicChatHandler: handleMessage()
+
+JoinPublicChatHandler->>PublicChatRoom: isParticipant(fd)?
+PublicChatRoom-->>JoinPublicChatHandler: false
+
+JoinPublicChatHandler->>PublicChatRoom: join(fd)
+PublicChatRoom->>PublicChatRoom: participants.insert(fd)
+
+JoinPublicChatHandler->>UserManager: getUsername(fd)
+UserManager-->>JoinPublicChatHandler: "Alice"
+
+JoinPublicChatHandler->>PublicChatRoom: getParticipantsCount()
+PublicChatRoom-->>JoinPublicChatHandler: 3
+
+JoinPublicChatHandler-->>JoinPublicChatThreadHandler: "Alice joined Public Chat Room. Current Members: 3"
+
+JoinPublicChatThreadHandler->>Responser: push HandlerResponse(destination=BROADCAST)
+
+Responser->>PublicChatRoom: getParticipants()
+PublicChatRoom-->>Responser: [fd1, fd2, fd3]
+
+par Broadcast to all
+    Responser->>ThreadPool: submit task
+    ThreadPool->>Client: send notification
     
-    ChatControllerThread->>ChatControllerThread: CommandParser::parse()
-    ChatControllerThread->>JoinPublicChatThreadHandler: push to join_queue
-    
-    JoinPublicChatThreadHandler->>JoinPublicChatHandler: handleMessage()
-    
-    JoinPublicChatHandler->>PublicChatRoom: isParticipant(fd)?
-    PublicChatRoom-->>JoinPublicChatHandler: false
-    
-    JoinPublicChatHandler->>PublicChatRoom: join(fd)
-    PublicChatRoom->>PublicChatRoom: participants.insert(fd)
-    
-    JoinPublicChatHandler->>UserManager: getUsername(fd)
-    UserManager-->>JoinPublicChatHandler: "Alice"
-    
-    JoinPublicChatHandler->>PublicChatRoom: getParticipantsCount()
-    PublicChatRoom-->>JoinPublicChatHandler: 3
-    
-    JoinPublicChatHandler-->>JoinPublicChatThreadHandler: "Alice joined Public Chat Room. Current Members: 3"
-    
-    JoinPublicChatThreadHandler->>Responser: push HandlerResponse(destination=BROADCAST)
-    
-    Responser->>PublicChatRoom: getParticipants()
-    PublicChatRoom-->>Responser: [fd1, fd2, fd3]
-    
-    par Broadcast to all
-        Responser->>ThreadPool: submit task
-        ThreadPool->>Client: send notification
-        
-        Responser->>ThreadPool: submit task
-        ThreadPool->>Others: send notification
-    end
+    Responser->>ThreadPool: submit task
+    ThreadPool->>Others: send notification
+end
+
 @enduml

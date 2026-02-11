@@ -1,6 +1,7 @@
 #include "ListUsersHandler.h"
 #include "ListUsersThreadHandler.h"
 #include "UserManager.h"
+#include "TimeUtils.h"
 
 std::string ListUsersHandler::handleMessage(ConnectionPtr conn, CommandPtr command, EpollInstancePtr epoll_instance){
     (void)command;
@@ -16,7 +17,8 @@ std::string ListUsersHandler::handleMessage(ConnectionPtr conn, CommandPtr comma
     auto& userMgr = UserManager::getInstance();
     auto all_users = userMgr.getAllLoggedInUsers();
     
-    std::string user_list = "Online Users:\n";
+    std::string timestamp = TimeUtils::getCurrentTimestamp();
+    std::string user_list = "[" + timestamp + "] Online Users:\n";
     
     for(const auto& [fd, username] : all_users){
         user_list += "  - " + username + " (fd=" + std::to_string(fd) + ")\n";

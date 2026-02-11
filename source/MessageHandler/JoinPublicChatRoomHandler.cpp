@@ -1,6 +1,7 @@
 #include "JoinPublicChatRoomHandler.h"
 #include "PublicChatRoom.h"
 #include "UserManager.h"
+#include "TimeUtils.h"
 
 std::string JoinPublicChatHandler::handleMessage(ConnectionPtr conn, CommandPtr command, EpollInstancePtr epoll_instance){
     (void)epoll_instance;
@@ -26,5 +27,7 @@ std::string JoinPublicChatHandler::handleMessage(ConnectionPtr conn, CommandPtr 
     auto& userMgr = UserManager::getInstance();
     std::string username = userMgr.getUsername(fd).value();
 
-    return username + " joined Public Chat Room. Current Members: " + std::to_string(room.getParticipantsCount());
+    std::string timestamp = TimeUtils::getCurrentTimestamp();
+    
+    return "[" + timestamp + "] " + username + " joined Public Chat Room. Current Members: " + std::to_string(room.getParticipantsCount());
 }

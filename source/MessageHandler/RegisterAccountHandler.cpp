@@ -1,5 +1,6 @@
 #include "RegisterAccountHandler.h"
 #include <regex>
+#include "TimeUtils.h"
 
 RegisterAccountHandler::RegisterAccountHandler(DataBaseThreadPtr db_thread) : db_thread(db_thread) {}
 
@@ -35,9 +36,9 @@ std::string RegisterAccountHandler::handleMessage(ConnectionPtr conn, CommandPtr
     req->username = username;
     req->password = password;
     req->fd = conn->getFd();
-    req->callback = [&](bool success, std::string& msg){
+    req->callback = [&](bool isSuccess, std::string& msg){
         std::lock_guard<std::mutex> lock(result_mutex);
-        (void)success;
+        register_success = isSuccess;
         result = msg;
         done = true;
         result_cv.notify_one();
@@ -50,6 +51,11 @@ std::string RegisterAccountHandler::handleMessage(ConnectionPtr conn, CommandPtr
     
     if(!done){
         return "Error: Database timeout";
+    }
+
+    if(register_success){
+        std::string timestamp = TimeUtils::getCurrentTimestamp();
+        return "[" + timestamp + "] " + result;
     }
     
     return result;

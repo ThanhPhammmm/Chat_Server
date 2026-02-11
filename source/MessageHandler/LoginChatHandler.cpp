@@ -1,5 +1,6 @@
 #include "LoginChatHandler.h"
 #include "UserManager.h"
+#include "TimeUtils.h"
 
 LoginChatHandler::LoginChatHandler(DataBaseThreadPtr db_thread) : db_thread(db_thread) {}
 
@@ -33,9 +34,9 @@ std::string LoginChatHandler::handleMessage(ConnectionPtr conn, CommandPtr comma
     req->username = username;
     req->password = password;
     req->fd = fd;
-    req->callback = [&](bool success, const std::string& msg){
+    req->callback = [&](bool isSuccess, const std::string& msg){
         std::lock_guard<std::mutex> lock(result_mutex);
-        login_success = success;
+        login_success = isSuccess;
         result = msg;
         done = true;
         result_cv.notify_one();
@@ -52,6 +53,8 @@ std::string LoginChatHandler::handleMessage(ConnectionPtr conn, CommandPtr comma
     
     if(login_success){
         userMgr.loginUser(fd, username);
+        std::string timestamp = TimeUtils::getCurrentTimestamp();
+        return "[" + timestamp + "] Success: Logged in as " + username;
     }
     
     return result;

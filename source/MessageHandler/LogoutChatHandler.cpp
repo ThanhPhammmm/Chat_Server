@@ -1,5 +1,6 @@
 #include "LogoutChatHandler.h"
 #include "UserManager.h"
+#include "TimeUtils.h"
 
 std::string LogoutChatHandler::handleMessage(ConnectionPtr conn, CommandPtr command, EpollInstancePtr epoll_instance){
     (void)epoll_instance;
@@ -19,5 +20,6 @@ std::string LogoutChatHandler::handleMessage(ConnectionPtr conn, CommandPtr comm
     std::string username = userMgr.getUsername(fd).value();
     userMgr.logoutUser(fd);
     
-    return "Success: Logged out " + username;
+    std::string timestamp = TimeUtils::getCurrentTimestamp();
+    return "[" + timestamp + "] Success: Logged out " + username;
 }

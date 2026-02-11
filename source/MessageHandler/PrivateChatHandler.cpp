@@ -2,6 +2,7 @@
 #include "PrivateChatThreadHandler.h"
 #include "PublicChatRoom.h"
 #include "UserManager.h"
+#include "TimeUtils.h"
 
 std::string PrivateChatHandler::handleMessage(ConnectionPtr conn, CommandPtr command, EpollInstancePtr epoll_instance){
     if(!conn || conn->isClosed()){
@@ -50,5 +51,7 @@ std::string PrivateChatHandler::handleMessage(ConnectionPtr conn, CommandPtr com
         full_message += command->args[i];
     }
     
-    return "[Private from " + my_username + "]: " + full_message;
+    std::string timestamp = TimeUtils::getCurrentTimestamp();
+    
+    return "[" + timestamp + "] [Private from " + my_username + "]: " + full_message;
 }

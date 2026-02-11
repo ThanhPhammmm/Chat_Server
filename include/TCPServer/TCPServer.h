@@ -43,6 +43,7 @@
 #include "LoginChatThreadHandler.h"
 #include "LogoutChatHandler.h"
 #include "LogoutChatThreadHandler.h"
+#include "TimeUtils.h"
 
 #define BUFFER_SIZE 4096
 #define MAX_EVENTS 1024

@@ -1,6 +1,7 @@
 #include "PublicChatHandler.h"
 #include "PublicChatRoom.h"
 #include "UserManager.h"
+#include "TimeUtils.h"
 
 std::string PublicChatHandler::handleMessage(ConnectionPtr conn, CommandPtr command, EpollInstancePtr epoll_instance){
     (void)epoll_instance;
@@ -50,5 +51,7 @@ std::string PublicChatHandler::handleMessage(ConnectionPtr conn, CommandPtr comm
         full_message += " " + command->args[i];
     }
     
-    return "[Public] " + username + ": " + full_message;
+    std::string timestamp = TimeUtils::getCurrentTimestamp();
+    
+    return "[" + timestamp + "] [Public] " + username + ": " + full_message;
 }

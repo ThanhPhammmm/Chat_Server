@@ -1,6 +1,7 @@
 #include "LeavePublicChatRoomHandler.h"
 #include "PublicChatRoom.h"
 #include "UserManager.h"
+#include "TimeUtils.h"
 
 std::string LeavePublicChatHandler::handleMessage(ConnectionPtr conn, CommandPtr command, EpollInstancePtr epoll_instance){
     (void)epoll_instance;
@@ -25,6 +26,7 @@ std::string LeavePublicChatHandler::handleMessage(ConnectionPtr conn, CommandPtr
 
     auto& userMgr = UserManager::getInstance();
     std::string username = userMgr.getUsername(fd).value();
-
-    return username + " left public chat room. Current Members: " + std::to_string(room.getParticipantsCount());
+    std::string timestamp = TimeUtils::getCurrentTimestamp();
+    
+    return "[" + timestamp + "] " + username + " left public chat room. Current Members: " + std::to_string(room.getParticipantsCount());
 }

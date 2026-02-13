@@ -11,7 +11,7 @@ class PublicChatRoom{
         PublicChatRoom() = default;
         ~PublicChatRoom() = default;
 
-        PublicChatRoom& getInstance();
+        static PublicChatRoom& getInstance();
         void join(int fd);
         void leave(int fd);
         std::unordered_set<int> getParticipants();

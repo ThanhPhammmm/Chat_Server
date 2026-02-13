@@ -1,6 +1,7 @@
 #include "Epoll.h"
 #include "Logger.h"
 #include "UserManager.h"
+#include "PublicChatRoom.h"
 
 EpollInstance::EpollInstance(){
     epfd = epoll_create1(0);
@@ -85,6 +86,7 @@ void EpollInstance::removeFd(int fd){
     }
 
     UserManager::getInstance().logoutUser(fd);
+    PublicChatRoom::getInstance().leave(fd);
 
     if(conn && !conn->isClosed()){
         conn->close();

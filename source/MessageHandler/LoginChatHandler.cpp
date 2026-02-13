@@ -29,6 +29,14 @@ std::string LoginChatHandler::handleMessage(ConnectionPtr conn, CommandPtr comma
         return "Error: User already logged in from another connection";
     }
     
+
+    /* Wait for database thread response */
+    std::string result;
+    std::mutex result_mutex;
+    std::condition_variable result_cv;
+    bool done = false;
+    bool login_success = false;
+
     auto req = std::make_shared<DBRequest>();
     req->type = DBOperationType::VERIFY_LOGIN;
     req->username = username;

@@ -212,6 +212,9 @@ int main(){
         response_dispatcher->stop();
         LOG_DEBUG("Response Dispatcher stopped");
 
+        ackMgr->stop();
+        LOG_DEBUG("ACK manager stopped");
+
         db_thread->stop();
         LOG_DEBUG("Database thread stopped");
 

@@ -164,8 +164,8 @@ void Responser::sendBackToClient(HandlerResponsePtr resp){
 
         MessageAckManager::getInstance().addPendingMessage(msg_id, resp, conn);
 
-        const char* data = content.data();
-        size_t remaining = content.size();
+        const char* data = full_message.data();
+        size_t remaining = full_message.size();
         int retry_count = 0;
         const int MAX_RETRIES = 3;
 

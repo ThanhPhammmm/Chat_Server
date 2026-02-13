@@ -31,6 +31,14 @@ std::string RegisterAccountHandler::handleMessage(ConnectionPtr conn, CommandPtr
         return "Error: Username can only contain letters, numbers, and underscores";
     }
     
+
+    /* Wait for database thread response */
+    std::string result;
+    std::mutex result_mutex;
+    std::condition_variable result_cv;
+    bool done = false;
+    bool register_success = false;
+
     auto req = std::make_shared<DBRequest>();
     req->type = DBOperationType::REGISTER_USER;
     req->username = username;

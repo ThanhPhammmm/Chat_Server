@@ -31,16 +31,14 @@ std::string PrivateChatHandler::handleMessage(ConnectionPtr conn, CommandPtr com
         return "Error: User not found: " + target_username;
     }
 
-    int received_fd = std::stoi(command->args[0]);
-
     PublicChatRoom tmp;
     auto& room = tmp.getInstance();
     
-    if(room.isParticipant(received_fd)){
+    if(room.isParticipant(target_fd_opt.value())){
         return "Error: This user is in a public chat room";
     }
 
-    if(!epoll_instance->isEpollMember(received_fd)){
+    if(!epoll_instance->isEpollMember(target_fd_opt.value())){
         return "Error: This client does not exist";
     }
 

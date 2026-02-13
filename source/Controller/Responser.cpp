@@ -131,6 +131,7 @@ void Responser::sendToClient(HandlerResponsePtr resp){
                 retry_count = 0;
             }
         }
+        
         if(remaining > 0){
             LOG_WARNING_STREAM("Failed to send complete message (fd=" << fd << ", " << remaining << " bytes remaining)");
         }

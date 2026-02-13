@@ -9,10 +9,7 @@
 
 enum class DBOperationType{
     REGISTER_USER,
-    VERIFY_LOGIN,
-    UPDATE_LAST_LOGIN,
-    GET_USER,
-    CHECK_USERNAME_EXISTS
+    VERIFY_LOGIN
 };
 
 struct DBRequest{

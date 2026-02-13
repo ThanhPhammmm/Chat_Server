@@ -9,7 +9,12 @@
 
 enum class DBOperationType{
     REGISTER_USER,
-    VERIFY_LOGIN
+    VERIFY_LOGIN,
+    GET_USER,
+    ADD_PENDING_MESSAGE,
+    UPDATE_MESSAGE_STATUS,
+    DELETE_PENDING_MESSAGE,
+    GET_PENDING_MESSAGES
 };
 
 struct DBRequest{
@@ -19,6 +24,11 @@ struct DBRequest{
     int fd;
     int request_id;
     std::function<void(bool success, std::string&)> callback;
+
+    int sender_id;
+    int receiver_id;
+    std::string message_id;
+    std::string status;
 };
 
 using DBRequestPtr = std::shared_ptr<DBRequest>;

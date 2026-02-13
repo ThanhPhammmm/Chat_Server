@@ -29,9 +29,7 @@ void JoinPublicChatThreadHandler::run(){
             resp->connection = req->connection;
             resp->response_message = response;
             resp->fd = req->fd;
-            resp->destination = response.find("Error:") == 0 ? 
-                               ResponseDestination::ERROR_TO_CLIENT : 
-                               ResponseDestination::BROADCAST_PUBLIC_CHAT_ROOM;
+            resp->destination = response.find("Error:") == 0 ? ResponseDestination::ERROR_TO_CLIENT : ResponseDestination::BROADCAST_PUBLIC_CHAT_ROOM;
             resp->exclude_fd = -1;
             resp->user_destination = -1;
             

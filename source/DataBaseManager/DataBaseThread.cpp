@@ -80,11 +80,6 @@ void DataBaseThread::processRequest(DBRequestPtr req){
             }
             break;
             
-        case DBOperationType::UPDATE_LAST_LOGIN:
-            success = db_manager->updateLastLogin(req->username);
-            message = success ? "Success: Last login updated" : "Error: Update failed";
-            break;
-            
         case DBOperationType::GET_USER:
             {
                 auto user = db_manager->getUser(req->username);
@@ -92,14 +87,45 @@ void DataBaseThread::processRequest(DBRequestPtr req){
                 message = success ? "User found" : "User not found";
             }
             break;
+
+        case DBOperationType::ADD_PENDING_MESSAGE:
+            success = db_manager->addPendingMessage(req->message_id, req->sender_id, req->receiver_id);
+            message = success ? "Message added to pending queue" : "Failed to add message";
+            break;
+
+        case DBOperationType::UPDATE_MESSAGE_STATUS:
+            success = db_manager->updateMessageStatus(req->message_id, req->status);
+            message = success ? "Message status updated" : "Failed to update status";
             
-        case DBOperationType::CHECK_USERNAME_EXISTS:
-            success = db_manager->usernameExists(req->username);
-            message = success ? "Username exists" : "Username available";
+            if(success && req->status == "sent"){
+                db_manager->incrementRetryCount(req->message_id);
+            }
+            break;
+
+        case DBOperationType::DELETE_PENDING_MESSAGE:
+            success = db_manager->deletePendingMessage(req->message_id);
+            message = success ? "Message removed from pending queue" : "Failed to remove message";
+            break;
+
+        case DBOperationType::GET_PENDING_MESSAGES:
+            {
+                auto pending_msgs = db_manager->getPendingMessages();
+                success = true;
+                message = "Loaded " + std::to_string(pending_msgs.size()) + " pending messages";
+                
+                if(!pending_msgs.empty()){
+                    LOG_INFO_STREAM("Found " << pending_msgs.size() << " pending messages:");
+                    for(const auto& msg : pending_msgs){
+                        LOG_DEBUG_STREAM("  - " << msg.message_id << " from user_id=" << msg.sender_id << " to user_id=" << msg.receiver_id<< " status=" << msg.status<< " retries=" << msg.retry_count);
+                    }
+                }
+            }
             break;
     }
     
     if(req->callback){
+        LOG_DEBUG_STREAM("User logged in1");
         req->callback(success, message);
+        LOG_DEBUG_STREAM("User logged in2");
     }
 }

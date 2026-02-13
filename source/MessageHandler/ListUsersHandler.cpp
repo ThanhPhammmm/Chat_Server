@@ -13,10 +13,14 @@ std::string ListUsersHandler::handleMessage(ConnectionPtr conn, CommandPtr comma
     if(!epoll_instance){
         return "Error: Server error - no epoll instance";
     }
-
-    auto& userMgr = UserManager::getInstance();
-    auto all_users = userMgr.getAllLoggedInUsers();
     
+    auto& userMgr = UserManager::getInstance();
+    int fd = conn->getFd();
+    if(!userMgr.isLoggedIn(fd)){
+        return "Error: Please log in first\n" ;
+    }
+
+    auto all_users = userMgr.getAllLoggedInUsers();
     std::string timestamp = TimeUtils::getCurrentTimestamp();
     std::string user_list = "[" + timestamp + "] Online Users:\n";
     

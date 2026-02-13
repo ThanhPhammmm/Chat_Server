@@ -4,12 +4,8 @@ Improvement:
 - Resend
 
 BUG:
-- Now it is free
+- ACK failed
 
 Test:
-- Not yet tested register feature
-- Logout
-- Check authentication of a user
-- Save to database?
-- Login with user name, password, for indentity
 - Check all diagrams
+- ACK

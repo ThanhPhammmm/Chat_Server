@@ -1,6 +1,7 @@
 #include "LoginChatHandler.h"
 #include "UserManager.h"
 #include "TimeUtils.h"
+#include "Logger.h"
 
 LoginChatHandler::LoginChatHandler(DataBaseThreadPtr db_thread) : db_thread(db_thread) {}
 
@@ -28,7 +29,6 @@ std::string LoginChatHandler::handleMessage(ConnectionPtr conn, CommandPtr comma
     if(userMgr.isUsernameLoggedIn(username)){
         return "Error: User already logged in from another connection";
     }
-    
 
     /* Wait for database thread response */
     std::string result;
@@ -36,6 +36,7 @@ std::string LoginChatHandler::handleMessage(ConnectionPtr conn, CommandPtr comma
     std::condition_variable result_cv;
     bool done = false;
     bool login_success = false;
+    int user_id = -1;
 
     auto req = std::make_shared<DBRequest>();
     req->type = DBOperationType::VERIFY_LOGIN;
@@ -52,17 +53,59 @@ std::string LoginChatHandler::handleMessage(ConnectionPtr conn, CommandPtr comma
     
     db_thread->submitRequest(req);
     
-    std::unique_lock<std::mutex> lock(result_mutex);
-    result_cv.wait_for(lock, std::chrono::seconds(5), [&]{ return done; });
-    
+    {
+        std::unique_lock<std::mutex> lock(result_mutex);
+        result_cv.wait_for(lock, std::chrono::seconds(5), [&]{ return done; });
+    }
     if(!done){
         return "Error: Database timeout";
     }
     
     if(login_success){
-        userMgr.loginUser(fd, username);
+        auto get_user_req = std::make_shared<DBRequest>();
+        get_user_req->type = DBOperationType::GET_USER;
+        get_user_req->username = username;
+        
+        bool user_fetched = false;
+        get_user_req->callback = [&](bool success, const std::string& msg){
+            (void)msg;
+                            LOG_DEBUG_STREAM("User logged in3");
+
+            std::lock_guard<std::mutex> lock1(result_mutex);
+            if(success){
+                                            LOG_DEBUG_STREAM("User logged in4");
+
+                auto& dbMgr = DataBaseManager::getInstance();
+                auto user_opt = dbMgr.getUser(username);
+                if(user_opt.has_value()){
+                                                LOG_DEBUG_STREAM("User logged in5");
+
+                    user_id = user_opt.value().id;
+                }
+                                            LOG_DEBUG_STREAM("User logged in6");
+
+            }
+                                        LOG_DEBUG_STREAM("User logged in7");
+
+            user_fetched = true;
+            result_cv.notify_one();
+
+
+        LOG_DEBUG_STREAM("User logged in1: " << username << " (fd=" << fd << ")");
+
+        };
+        
+        db_thread->submitRequest(get_user_req);
+        {
+            std::unique_lock<std::mutex> lock1(result_mutex);
+            result_cv.wait_for(lock1, std::chrono::seconds(2), [&]{ return user_fetched; });
+       }   
+        LOG_DEBUG_STREAM("User logged in2: " << username << " (fd=" << fd << ")");
+
+        userMgr.loginUser(fd, username, user_id);
+        
         std::string timestamp = TimeUtils::getCurrentTimestamp();
-        return "[" + timestamp + "] Success: Logged in as " + username;
+        return "[" + timestamp + "] Success: Logged in as " + username + " (user_id=" + std::to_string(user_id) + ")";
     }
     
     return result;

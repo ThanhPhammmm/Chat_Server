@@ -15,6 +15,17 @@ struct User{
     std::string last_login;
 };
 
+struct PendingMessageRecord{
+    int id;
+    std::string message_id;
+    int sender_id;
+    int receiver_id;
+    std::string status;  // 'pending', 'sent', 'acknowledged', 'failed'
+    std::string created_at;
+    std::string last_retry_at;
+    int retry_count;
+};
+
 class DataBaseManager{
     private:
         sqlite3* db;
@@ -35,7 +46,12 @@ class DataBaseManager{
         bool usernameExists(const std::string& username);
         bool updateLastLogin(const std::string& username);
         std::optional<User> getUser(const std::string& username);
-        std::vector<std::string> getAllUsernames();
+
+        bool addPendingMessage(const std::string& message_id, int sender_id, int receiver_id);
+        bool updateMessageStatus(const std::string& message_id, const std::string& status);
+        bool deletePendingMessage(const std::string& message_id);
+        bool incrementRetryCount(const std::string& message_id);
+        std::vector<PendingMessageRecord> getPendingMessages();
 };
 
 using DatabaseManagerPtr = std::shared_ptr<DataBaseManager>;

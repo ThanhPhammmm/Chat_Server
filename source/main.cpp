@@ -39,17 +39,27 @@ int main(){
     LOG_INFO_STREAM("Main Thread: " << std::this_thread::get_id());
 
     try{
-        LOG_DEBUG("Starting ACK manager...");
-        auto ackMgr = std::make_shared<MessageAckThreadHandler>();
-        ackMgr->start();
-        LOG_DEBUG("ACK manager started");
-
         // 0. START DATABASE THREAD
         LOG_DEBUG("Starting database thread...");
         auto db_thread = std::make_shared<DataBaseThread>();
         db_thread->start();
         LOG_DEBUG("Database thread started");
         
+        // 0. INITIALIZE ACK MANAGER WITH DATABASE
+        LOG_DEBUG("Initializing ACK manager with database...");
+        auto& ackMgr = MessageAckManager::getInstance();
+        ackMgr.setDatabaseThread(db_thread);
+        
+        // 0. Load any pending messages from previous session
+        ackMgr.loadPendingMessagesFromDB();
+        LOG_DEBUG("ACK manager initialized");
+        
+        // 0. START ACK MANAGER THREAD
+        LOG_DEBUG("Starting ACK manager thread...");
+        auto ackMgrThread = std::make_shared<MessageAckThreadHandler>();
+        ackMgrThread->start();
+        LOG_DEBUG("ACK manager thread started");
+
         // 1. CREATE CORE COMPONENTS
         LOG_DEBUG("Creating core components...");
         auto thread_pool = std::make_shared<ThreadPool>(Config::THREAD_POOL_SIZE);
@@ -212,8 +222,8 @@ int main(){
         response_dispatcher->stop();
         LOG_DEBUG("Response Dispatcher stopped");
 
-        ackMgr->stop();
-        LOG_DEBUG("ACK manager stopped");
+        ackMgrThread->stop();
+        LOG_DEBUG("ACK manager thread stopped");
 
         db_thread->stop();
         LOG_DEBUG("Database thread stopped");

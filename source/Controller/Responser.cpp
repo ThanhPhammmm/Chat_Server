@@ -2,6 +2,7 @@
 #include "PublicChatRoom.h"
 #include "Logger.h"
 #include "MessageAckManager.h"
+#include "UserManager.h"
 
 Responser::Responser(std::shared_ptr<MessageQueue<HandlerResponsePtr>> resp_queue,
                      ThreadPoolPtr pool,
@@ -71,17 +72,32 @@ void Responser::sendToClient(HandlerResponsePtr resp){
     }
 
     auto& ackMgr = MessageAckManager::getInstance();
+    auto& userMgr = UserManager::getInstance();
+    
     std::string msg_id = ackMgr.generateMessageId();
     std::string full_message = msg_id + "|" + resp->response_message;
 
-    thread_pool->submit([msg_id, resp, full_message](){
+    int sender_id = -1;
+    int receiver_id = -1;
+
+    auto sender_user_id = userMgr.getUserId(resp->fd);
+    if(sender_user_id.has_value()){
+        sender_id = sender_user_id.value();
+    }
+    
+    auto receiver_user_id = userMgr.getUserId(resp->user_destination);
+    if(receiver_user_id.has_value()){
+        receiver_id = receiver_user_id.value();
+    }
+
+    thread_pool->submit([msg_id, resp, full_message, sender_id, receiver_id](){
         if(!resp || !resp->connection){
             LOG_WARNING("Attempted to send to null connection");
             return;
         }
+
         auto conn = resp->connection;
         int user_destination = resp->user_destination;
-        std::string content = resp->response_message;
 
         if(!conn || conn->isClosed()){
             return;
@@ -92,7 +108,7 @@ void Responser::sendToClient(HandlerResponsePtr resp){
             return;
         }
 
-        MessageAckManager::getInstance().addPendingMessage(msg_id, resp, conn);
+        MessageAckManager::getInstance().addPendingMessage(msg_id, resp, conn, sender_id, receiver_id);
 
         const char* data = full_message.data();
         size_t remaining = full_message.size();
@@ -144,16 +160,24 @@ void Responser::sendBackToClient(HandlerResponsePtr resp){
         return;
     }
     auto& ackMgr = MessageAckManager::getInstance();
+    auto& userMgr = UserManager::getInstance();
+    
     std::string msg_id = ackMgr.generateMessageId();
     std::string full_message = msg_id + "|" + resp->response_message;
 
-    thread_pool->submit([msg_id, resp, full_message](){
+    int sender_id = -1;
+    auto sender_user_id = userMgr.getUserId(resp->fd);
+    if(sender_user_id.has_value()){
+        sender_id = sender_user_id.value();
+    }
+
+    thread_pool->submit([msg_id, resp, full_message, sender_id](){
         if(!resp || !resp->connection){
             LOG_WARNING("Attempted to send to null connection");
             return;
         }
+
         auto conn = resp->connection;
-        std::string content = resp->response_message;
 
         if(!conn || conn->isClosed()){
             return;
@@ -163,7 +187,7 @@ void Responser::sendBackToClient(HandlerResponsePtr resp){
             return;
         }
 
-        MessageAckManager::getInstance().addPendingMessage(msg_id, resp, conn);
+        MessageAckManager::getInstance().addPendingMessage(msg_id, resp, conn, sender_id, sender_id);
 
         const char* data = full_message.data();
         size_t remaining = full_message.size();

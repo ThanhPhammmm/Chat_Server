@@ -60,6 +60,42 @@ bool DataBaseManager::initialize(){
         sqlite3_free(err_msg);
         return false;
     }
+
+    const char* create_pending_messages_table = 
+        "CREATE TABLE IF NOT EXISTS pending_messages ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "message_id TEXT UNIQUE NOT NULL,"
+        "sender_id INTEGER NOT NULL,"
+        "receiver_id INTEGER NOT NULL,"
+        "status TEXT DEFAULT 'pending',"  // pending, sent, acknowledged, failed
+        "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
+        "last_retry_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
+        "retry_count INTEGER DEFAULT 0,"
+        "FOREIGN KEY (sender_id) REFERENCES users(id),"
+        "FOREIGN KEY (receiver_id) REFERENCES users(id)"
+        ");";
+    
+    rc = sqlite3_exec(db, create_pending_messages_table, nullptr, nullptr, &err_msg);
+    
+    if(rc != SQLITE_OK){
+        LOG_ERROR_STREAM("SQL error creating pending_messages table: " << err_msg);
+        sqlite3_free(err_msg);
+        return false;
+    }
+    
+    // Create index for faster queries
+    const char* create_index = 
+        "CREATE INDEX IF NOT EXISTS idx_pending_messages_status "
+        "ON pending_messages(status);";
+    
+    rc = sqlite3_exec(db, create_index, nullptr, nullptr, &err_msg);
+    
+    if(rc != SQLITE_OK){
+        LOG_ERROR_STREAM("SQL error creating index: " << err_msg);
+        sqlite3_free(err_msg);
+        return false;
+    }
+
     LOG_DEBUG("Database initialized successfully");
     return true;
 }
@@ -172,6 +208,120 @@ bool DataBaseManager::updateLastLogin(const std::string& username){
     return rc == SQLITE_DONE;
 }
 
+bool DataBaseManager::addPendingMessage(const std::string& message_id, int sender_id, int receiver_id){
+    std::lock_guard<std::mutex> lock(db_mutex);
+    
+    if(!db) return false;
+    
+    const char* sql = 
+        "INSERT INTO pending_messages (message_id, sender_id, receiver_id, status) "
+        "VALUES (?, ?, ?, 'pending');";
+    
+    sqlite3_stmt* stmt;
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
+    if(rc != SQLITE_OK){
+        LOG_ERROR_STREAM("Failed to prepare add pending message: " << sqlite3_errmsg(db));
+        return false;
+    }
+    
+    sqlite3_bind_text(stmt, 1, message_id.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt, 2, sender_id);
+    sqlite3_bind_int(stmt, 3, receiver_id);
+    
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    
+    if(rc != SQLITE_DONE){
+        LOG_ERROR_STREAM("Failed to add pending message: " << sqlite3_errmsg(db));
+        return false;
+    }
+    
+    LOG_DEBUG_STREAM("Added pending message: " << message_id);
+    return true;
+}
+
+bool DataBaseManager::updateMessageStatus(const std::string& message_id, const std::string& status){
+    std::lock_guard<std::mutex> lock(db_mutex);
+    
+    if(!db) return false;
+    
+    const char* sql = 
+        "UPDATE pending_messages SET status = ?, last_retry_at = CURRENT_TIMESTAMP "
+        "WHERE message_id = ?;";
+    
+    sqlite3_stmt* stmt;
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
+    if(rc != SQLITE_OK){
+        LOG_ERROR_STREAM("Failed to prepare update status: " << sqlite3_errmsg(db));
+        return false;
+    }
+    
+    sqlite3_bind_text(stmt, 1, status.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, message_id.c_str(), -1, SQLITE_TRANSIENT);
+    
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    
+    if(rc != SQLITE_DONE){
+        LOG_ERROR_STREAM("Failed to update message status: " << sqlite3_errmsg(db));
+        return false;
+    }
+    
+    LOG_DEBUG_STREAM("Updated message " << message_id << " status to: " << status);
+    return true;
+}
+
+bool DataBaseManager::deletePendingMessage(const std::string& message_id){
+    std::lock_guard<std::mutex> lock(db_mutex);
+    
+    if(!db) return false;
+    
+    const char* sql = "DELETE FROM pending_messages WHERE message_id = ?;";
+    
+    sqlite3_stmt* stmt;
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
+    if(rc != SQLITE_OK){
+        LOG_ERROR_STREAM("Failed to prepare delete: " << sqlite3_errmsg(db));
+        return false;
+    }
+    
+    sqlite3_bind_text(stmt, 1, message_id.c_str(), -1, SQLITE_TRANSIENT);
+    
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    
+    if(rc != SQLITE_DONE){
+        LOG_ERROR_STREAM("Failed to delete pending message: " << sqlite3_errmsg(db));
+        return false;
+    }
+    
+    LOG_DEBUG_STREAM("Deleted pending message: " << message_id);
+    return true;
+}
+
+bool DataBaseManager::incrementRetryCount(const std::string& message_id){
+    std::lock_guard<std::mutex> lock(db_mutex);
+    
+    if(!db) return false;
+    
+    const char* sql = 
+        "UPDATE pending_messages SET retry_count = retry_count + 1, "
+        "last_retry_at = CURRENT_TIMESTAMP WHERE message_id = ?;";
+    
+    sqlite3_stmt* stmt;
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
+    if(rc != SQLITE_OK){
+        return false;
+    }
+    
+    sqlite3_bind_text(stmt, 1, message_id.c_str(), -1, SQLITE_TRANSIENT);
+    
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    
+    return rc == SQLITE_DONE;
+}
+
 std::optional<User> DataBaseManager::getUser(const std::string& username){
     std::lock_guard<std::mutex> lock(db_mutex);
     
@@ -207,25 +357,39 @@ std::optional<User> DataBaseManager::getUser(const std::string& username){
     return user;
 }
 
-std::vector<std::string> DataBaseManager::getAllUsernames(){
+std::vector<PendingMessageRecord> DataBaseManager::getPendingMessages(){
     std::lock_guard<std::mutex> lock(db_mutex);
     
-    std::vector<std::string> usernames;
-    if(!db) return usernames;
+    std::vector<PendingMessageRecord> records;
+    if(!db) return records;
     
-    const char* sql = "SELECT username FROM users ORDER BY username;";
+    const char* sql = 
+        "SELECT id, message_id, sender_id, receiver_id, status, "
+        "created_at, last_retry_at, retry_count "
+        "FROM pending_messages WHERE status = 'pending' OR status = 'sent' "
+        "ORDER BY created_at ASC;";
+    
     sqlite3_stmt* stmt;
-    
     int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
     if(rc != SQLITE_OK){
-        return usernames;
+        LOG_ERROR_STREAM("Failed to prepare get pending messages: " << sqlite3_errmsg(db));
+        return records;
     }
     
     while(sqlite3_step(stmt) == SQLITE_ROW){
-        const char* username = (const char*)sqlite3_column_text(stmt, 0);
-        usernames.push_back(username);
+        PendingMessageRecord rec;
+        rec.id = sqlite3_column_int(stmt, 0);
+        rec.message_id = (const char*)sqlite3_column_text(stmt, 1);
+        rec.sender_id = sqlite3_column_int(stmt, 2);
+        rec.receiver_id = sqlite3_column_int(stmt, 3);
+        rec.status = (const char*)sqlite3_column_text(stmt, 4);
+        rec.created_at = (const char*)sqlite3_column_text(stmt, 5);
+        rec.last_retry_at = (const char*)sqlite3_column_text(stmt, 6);
+        rec.retry_count = sqlite3_column_int(stmt, 7);
+        
+        records.push_back(rec);
     }
     
     sqlite3_finalize(stmt);
-    return usernames;
+    return records;
 }

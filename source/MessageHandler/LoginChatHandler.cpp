@@ -57,6 +57,7 @@ std::string LoginChatHandler::handleMessage(ConnectionPtr conn, CommandPtr comma
         std::unique_lock<std::mutex> lock(result_mutex);
         result_cv.wait_for(lock, std::chrono::seconds(5), [&]{ return done; });
     }
+
     if(!done){
         return "Error: Database timeout";
     }
@@ -67,44 +68,29 @@ std::string LoginChatHandler::handleMessage(ConnectionPtr conn, CommandPtr comma
         get_user_req->username = username;
         
         bool user_fetched = false;
-        get_user_req->callback = [&](bool success, const std::string& msg){
+        get_user_req->callback = [&result_mutex, &user_id, &user_fetched, &result_cv, username](bool success, const std::string& msg){
             (void)msg;
-                            LOG_DEBUG_STREAM("User logged in3");
-
             std::lock_guard<std::mutex> lock1(result_mutex);
             if(success){
-                                            LOG_DEBUG_STREAM("User logged in4");
-
                 auto& dbMgr = DataBaseManager::getInstance();
                 auto user_opt = dbMgr.getUser(username);
                 if(user_opt.has_value()){
-                                                LOG_DEBUG_STREAM("User logged in5");
-
                     user_id = user_opt.value().id;
                 }
-                                            LOG_DEBUG_STREAM("User logged in6");
-
             }
-                                        LOG_DEBUG_STREAM("User logged in7");
-
             user_fetched = true;
             result_cv.notify_one();
-
-
-        LOG_DEBUG_STREAM("User logged in1: " << username << " (fd=" << fd << ")");
-
         };
         
         db_thread->submitRequest(get_user_req);
         {
             std::unique_lock<std::mutex> lock1(result_mutex);
             result_cv.wait_for(lock1, std::chrono::seconds(2), [&]{ return user_fetched; });
-       }   
-        LOG_DEBUG_STREAM("User logged in2: " << username << " (fd=" << fd << ")");
-
+        }   
         userMgr.loginUser(fd, username, user_id);
         
         std::string timestamp = TimeUtils::getCurrentTimestamp();
+        LOG_INFO_STREAM("User logged in: " << username << " (fd=" << fd << ", user_id=" << user_id << ")");
         return "[" + timestamp + "] Success: Logged in as " + username + " (user_id=" + std::to_string(user_id) + ")";
     }
     

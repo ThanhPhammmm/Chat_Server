@@ -20,12 +20,18 @@
 #include <csignal>
 #include <variant>
 #include <thread>
+#include <deque>
 
 class Connection{
     private:
         std::atomic<int> fd;
         std::atomic<bool> closed{false};
         mutable std::mutex close_mutex;
+
+        std::deque<std::string> write_queue;
+        std::mutex write_mutex;
+        std::atomic<bool> writing{false};
+        std::string partial_write;
 
     public:
         explicit Connection(int socket_fd);
@@ -40,6 +46,19 @@ class Connection{
         int getFd();
         bool isClosed();
         void close();
+
+        void queueWrite(std::string data);
+        bool hasWriteData();
+        std::string popWriteData();
+        size_t getWriteQueueSize();
+        void clearWriteQueue();
+
+        bool isWriting() const { return writing.load(); }
+        void setWriting(bool val) { writing.store(val); }
+
+        void setPartialWrite(std::string data) { partial_write = std::move(data); }
+        std::string getPartialWrite() { return std::move(partial_write); }
+        bool hasPartialWrite() const { return !partial_write.empty(); }
 };
 
 using ConnectionPtr = std::shared_ptr<Connection>;

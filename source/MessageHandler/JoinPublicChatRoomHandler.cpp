@@ -16,8 +16,7 @@ std::string JoinPublicChatHandler::handleMessage(ConnectionPtr conn, CommandPtr 
         return "Error: Invalid file descriptor";
     }
 
-    PublicChatRoom tmp;
-    auto& room = tmp.getInstance();
+    auto& room = PublicChatRoom::getInstance();
     if(room.isParticipant(fd)){
         return "You are already in the public chat room.";
     };

@@ -10,7 +10,8 @@ class EpollInstance : public std::enable_shared_from_this<EpollInstance>{
 
         int epfd;
         std::unordered_set<int> epoll_fds;
-        std::unordered_map<int, Callback> handlers;
+        std::unordered_map<int, Callback> read_handlers;
+        std::unordered_map<int, Callback> write_handlers;
         std::unordered_map<int, ConnectionPtr> connections;
         std::mutex handlers_mutex;
         std::atomic<bool> should_stop{false};
@@ -19,9 +20,13 @@ class EpollInstance : public std::enable_shared_from_this<EpollInstance>{
         EpollInstance();
         ~EpollInstance();
 
-        // EpollInstance& GetInstance();
         void addFd(int fd, Callback cb, ConnectionPtr conn = nullptr);
         void removeFd(int fd);
+        
+        void enableWrite(int fd, Callback write_cb);
+        void disableWrite(int fd);
+        bool isWriteEnabled(int fd);
+
         ConnectionPtr getConnection(int fd);
         void run();
         void stop();

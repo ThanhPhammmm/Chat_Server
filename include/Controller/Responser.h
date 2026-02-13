@@ -8,7 +8,6 @@
 class Responser{
     private:
         std::shared_ptr<MessageQueue<HandlerResponsePtr>> response_queue;
-        ThreadPoolPtr thread_pool;
         EpollInstancePtr epoll_instance;
         std::thread worker_thread;
         std::atomic<bool> running{false};
@@ -18,10 +17,12 @@ class Responser{
         void sendToClient(HandlerResponsePtr resp);
         void broadcastToRoom(HandlerResponsePtr resp);
 
+        void sendWithEpoll(ConnectionPtr conn, int fd, const std::string& message);
+        void handleWritable(int fd);
+        bool trySend(int fd, const char* data, size_t len, size_t& sent);
+
     public:
-        Responser(std::shared_ptr<MessageQueue<HandlerResponsePtr>> resp_queue, 
-                  ThreadPoolPtr pool, 
-                  EpollInstancePtr epoll);
+        Responser(std::shared_ptr<MessageQueue<HandlerResponsePtr>> resp_queue, EpollInstancePtr epoll);
         void start();
         void stop();
 };

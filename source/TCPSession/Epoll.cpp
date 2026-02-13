@@ -32,7 +32,8 @@ EpollInstance::~EpollInstance(){
         }
     }
     connections.clear();
-    handlers.clear();
+    read_handlers.clear();
+    write_handlers.clear();
     
     if(epfd >= 0){
         close(epfd);
@@ -40,12 +41,7 @@ EpollInstance::~EpollInstance(){
     }
 }
 
-// EpollInstance& EpollInstance::GetInstance(){
-//     static EpollInstance epfd;
-//     return epfd;
-// }
-
-void EpollInstance::addFd(int fd, Callback cb, ConnectionPtr conn){
+void EpollInstance::addFd(int fd, Callback read_cb, ConnectionPtr conn){
     if(should_stop.load(std::memory_order_acquire)){
         std::cerr << "[WARNING] Attempted to add fd to stopped EpollInstance" << std::endl;
         return;
@@ -61,12 +57,69 @@ void EpollInstance::addFd(int fd, Callback cb, ConnectionPtr conn){
     }
     
     std::lock_guard<std::mutex> lock(handlers_mutex);  
-    handlers[fd] = cb;
+    read_handlers[fd] = read_cb;
 
     if(conn){
         connections[fd] = conn;
         epoll_fds.insert(fd);
     }
+}
+
+void EpollInstance::enableWrite(int fd, Callback write_cb){
+    std::lock_guard<std::mutex> lock(handlers_mutex);
+    
+    if(read_handlers.find(fd) == read_handlers.end()){
+        LOG_WARNING_STREAM("Attempted to enable write on unknown fd=" << fd);
+        return;
+    }
+    
+    if(write_handlers.find(fd) != write_handlers.end()){
+        write_handlers[fd] = write_cb;
+        return;
+    }
+
+    write_handlers[fd] = write_cb;
+    
+    epoll_event ev{};
+    ev.events = EPOLLIN | EPOLLOUT | EPOLLET | EPOLLRDHUP;
+    ev.data.fd = fd;
+    
+    if(epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &ev) < 0){
+        perror("epoll_ctl MOD (enable write)");
+        write_handlers.erase(fd);
+    }
+    
+    LOG_DEBUG_STREAM("Enabled EPOLLOUT for fd=" << fd);
+}
+
+void EpollInstance::disableWrite(int fd){
+    std::lock_guard<std::mutex> lock(handlers_mutex);
+    
+    auto it = write_handlers.find(fd);
+    if(it == write_handlers.end()){
+        return;
+    }
+
+    write_handlers.erase(fd);
+    
+    epoll_event ev{};
+    ev.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
+    ev.data.fd = fd;
+    
+    if(epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &ev) < 0){
+        perror("epoll_ctl MOD (disable write)");
+        if(errno != EBADF && errno != ENOENT){
+            LOG_ERROR_STREAM("epoll_ctl MOD (disable write) failed for fd=" << fd << ": " << strerror(errno));
+        }
+        return;
+    }
+    
+    LOG_DEBUG_STREAM("Disabled EPOLLOUT for fd=" << fd);
+}
+
+bool EpollInstance::isWriteEnabled(int fd){
+    std::lock_guard<std::mutex> lock(handlers_mutex);
+    return write_handlers.find(fd) != write_handlers.end();
 }
 
 void EpollInstance::removeFd(int fd){
@@ -75,7 +128,8 @@ void EpollInstance::removeFd(int fd){
     ConnectionPtr conn;
     {
         std::lock_guard<std::mutex> lock(handlers_mutex);
-        handlers.erase(fd);
+        read_handlers.erase(fd);
+        write_handlers.erase(fd);      
         epoll_fds.erase(fd);
         
         auto it = connections.find(fd);
@@ -108,7 +162,7 @@ void EpollInstance::run(){
     epoll_event events[MAX_EVENTS];
 
     while(!should_stop.load(std::memory_order_acquire)){
-        int n = epoll_wait(epfd, events, 1024, 1000);
+        int n = epoll_wait(epfd, events, MAX_EVENTS, 1000);
         
         if(n < 0){
             if(errno == EINTR) continue;
@@ -128,25 +182,43 @@ void EpollInstance::run(){
                 continue;
             }
             
-            Callback handler;
-            {
-                std::lock_guard<std::mutex> lock(handlers_mutex);
-                auto it = handlers.find(fd);
-                if(it == handlers.end()) continue;
-                handler = it->second;
+            if(ev & EPOLLIN){
+                Callback read_handler;
+                {
+                    std::lock_guard<std::mutex> lock(handlers_mutex);
+                    auto it = read_handlers.find(fd);
+                    if(it == read_handlers.end()) continue;
+                    read_handler = it->second;
+                }
+                
+                if(read_handler){
+                    try{
+                        read_handler(fd);
+                    }
+                    catch(const std::exception& e){
+                        LOG_ERROR_STREAM("Read handler exception for fd=" << fd << ": " << e.what());
+                        removeFd(fd);
+                    }
+                }
             }
             
-            if(handler){
-                try{
-                    handler(fd);
+            if(ev & EPOLLOUT){
+                Callback write_handler;
+                {
+                    std::lock_guard<std::mutex> lock(handlers_mutex);
+                    auto it = write_handlers.find(fd);
+                    if(it == write_handlers.end()) continue;
+                    write_handler = it->second;
                 }
-                catch(const std::exception& e){
-                    LOG_ERROR_STREAM("Handler exception for fd=" << fd << ": " << e.what());
-                    removeFd(fd);
-                }
-                catch(...){
-                    LOG_ERROR_STREAM("Unknown handler exception for fd=" << fd);
-                    removeFd(fd);
+                
+                if(write_handler){
+                    try{
+                        write_handler(fd);
+                    }
+                    catch(const std::exception& e){
+                        LOG_ERROR_STREAM("Write handler exception for fd=" << fd << ": " << e.what());
+                        removeFd(fd);
+                    }
                 }
             }
         }

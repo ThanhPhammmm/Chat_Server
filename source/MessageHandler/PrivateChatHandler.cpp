@@ -31,9 +31,7 @@ std::string PrivateChatHandler::handleMessage(ConnectionPtr conn, CommandPtr com
         return "Error: User not found: " + target_username;
     }
 
-    PublicChatRoom tmp;
-    auto& room = tmp.getInstance();
-    
+    auto& room = PublicChatRoom::getInstance();
     if(room.isParticipant(target_fd_opt.value())){
         return "Error: This user is in a public chat room";
     }

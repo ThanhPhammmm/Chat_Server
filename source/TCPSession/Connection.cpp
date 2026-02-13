@@ -54,5 +54,45 @@ void Connection::close(){
                 std::cerr << "[WARNING] Close error on fd=" << current_fd << ": " << strerror(errno) << std::endl;
             }
         }
+        clearWriteQueue();
     }
+}
+
+void Connection::queueWrite(std::string data){
+    if(data.empty()) return;
+    std::lock_guard<std::mutex> lock(write_mutex);
+    write_queue.push_back(std::move(data));
+}
+
+bool Connection::hasWriteData(){
+    std::lock_guard<std::mutex> lock(write_mutex);
+    return !write_queue.empty();
+}
+
+std::string Connection::popWriteData(){
+    std::lock_guard<std::mutex> lock(write_mutex);
+    
+    if(!partial_write.empty()){
+        return std::move(partial_write);
+    }
+    
+    if(write_queue.empty()){
+        return "";
+    }
+    
+    std::string data = std::move(write_queue.front());
+    write_queue.pop_front();
+    return data;
+}
+
+size_t Connection::getWriteQueueSize(){
+    std::lock_guard<std::mutex> lock(write_mutex);
+    return write_queue.size();
+}
+
+void Connection::clearWriteQueue(){
+    std::lock_guard<std::mutex> lock(write_mutex);
+    write_queue.clear();
+    partial_write.clear();
+    writing.store(false, std::memory_order_release);
 }

@@ -20,9 +20,7 @@ std::string PublicChatHandler::handleMessage(ConnectionPtr conn, CommandPtr comm
         return "Error: Please login first. Use /login <username>";
     }
 
-    PublicChatRoom tmp;
-    auto& room = tmp.getInstance();
-    
+    auto& room = PublicChatRoom::getInstance(); 
     if(!room.isParticipant(fd)){
         return "Error: You must join public chat room first. Use /join_public_chat";
     }

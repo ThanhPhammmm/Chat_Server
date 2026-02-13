@@ -13,10 +13,8 @@ static void setNonBlock(int fd){
 
 TCPServer::TCPServer(const sockaddr_in& addr, 
                      EpollInstancePtr epoll, 
-                     ThreadPoolPtr thread_pool,
                      std::shared_ptr<MessageQueue<Message>> to_router)
     : epoll_instance(epoll), 
-      thread_pool_instance(thread_pool),
       to_router_queue(to_router){ 
     
     listen_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -105,8 +103,10 @@ void TCPServer::onRead(int clientFd){
 
         if(content.substr(0, 4) == "ACK|"){
             std::string msg_id = content.substr(4);
-            MessageAckManager::getInstance().acknowledgeMessage(msg_id);
-            LOG_DEBUG_STREAM("[ACK] Received ACK for " << msg_id << " from fd=" << clientFd);
+            if(!msg_id.empty() && msg_id.find('|') == std::string::npos){
+                MessageAckManager::getInstance().acknowledgeMessage(msg_id);
+                LOG_DEBUG_STREAM("[ACK] Received ACK for " << msg_id);
+            }
             continue;
         }
 

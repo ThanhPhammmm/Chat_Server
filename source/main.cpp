@@ -2,7 +2,6 @@
 
 // Configuration constants
 namespace Config {
-    constexpr size_t THREAD_POOL_SIZE = 8;
     constexpr int QUEUE_POP_TIMEOUT_MS = 100;
     constexpr int MONITOR_INTERVAL_SEC = 30;
     constexpr size_t QUEUE_WARNING_THRESHOLD = 50;
@@ -62,8 +61,6 @@ int main(){
 
         // 1. CREATE CORE COMPONENTS
         LOG_DEBUG("Creating core components...");
-        auto thread_pool = std::make_shared<ThreadPool>(Config::THREAD_POOL_SIZE);
-        LOG_DEBUG_STREAM("ThreadPool created with " << Config::THREAD_POOL_SIZE << " workers");
         
         auto epoll_instance = std::make_shared<EpollInstance>();
         LOG_DEBUG("EpollInstance created");
@@ -121,7 +118,7 @@ int main(){
         
         // 6. CREATE RESPONSE DISPATCHER
         LOG_DEBUG("Creating response dispatcher...");
-        auto response_dispatcher = std::make_shared<Responser>(to_response_queue, thread_pool, epoll_instance);
+        auto response_dispatcher = std::make_shared<Responser>(to_response_queue, epoll_instance);
         LOG_DEBUG("Responser created");
         
         // 7. CREATE TCP SERVER
@@ -131,11 +128,13 @@ int main(){
         addr.sin_addr.s_addr = INADDR_ANY;
         addr.sin_port = htons(Config::SERVER_PORT);
         
-        auto server = std::make_shared<TCPServer>(addr, epoll_instance, thread_pool, to_incoming_queue);
-        
+        auto server = std::make_shared<TCPServer>(addr, epoll_instance, to_incoming_queue);
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
         server->startServer();
         LOG_DEBUG("TCP Server started successfully");
-        
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
         // 8. START ALL THREADS
         LOG_DEBUG("Starting worker threads...");
         register_thread->start();
@@ -189,8 +188,12 @@ int main(){
         server->stopServer();
         LOG_DEBUG("Server stopped");
 
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000)); 
+
         epoll_thread.stop();
         LOG_DEBUG("Epoll stopped");
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
         router->stop();
         LOG_DEBUG("Router stopped");

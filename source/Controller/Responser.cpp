@@ -4,11 +4,8 @@
 #include "MessageAckManager.h"
 #include "UserManager.h"
 
-Responser::Responser(std::shared_ptr<MessageQueue<HandlerResponsePtr>> resp_queue,
-                     ThreadPoolPtr pool,
-                     EpollInstancePtr epoll)
+Responser::Responser(std::shared_ptr<MessageQueue<HandlerResponsePtr>> resp_queue, EpollInstancePtr epoll)
     : response_queue(resp_queue),
-      thread_pool(pool),
       epoll_instance(epoll) {}
 
 void Responser::start(){
@@ -54,6 +51,7 @@ void Responser::run(){
             case ResponseDestination::BACK_TO_CLIENT:
                 sendBackToClient(resp);
                 break;
+                
             case ResponseDestination::BROADCAST_PUBLIC_CHAT_ROOM:
                 broadcastToRoom(resp);
                 break;
@@ -65,9 +63,127 @@ void Responser::run(){
     }
 }
 
+bool Responser::trySend(int fd, const char* data, size_t len, size_t& sent){
+    sent = 0;
+
+    while(sent < len){
+        ssize_t n = send(fd, data + sent, len - sent, MSG_NOSIGNAL | MSG_DONTWAIT);
+        
+        if(n < 0){
+            if(errno == EAGAIN || errno == EWOULDBLOCK){
+                return true;
+            }
+            else if(errno == EPIPE || errno == ECONNRESET){
+                LOG_DEBUG_STREAM("Connection closed during send (fd=" << fd << ")");
+                return false;
+            }
+            else{
+                LOG_ERROR_STREAM("Send error (fd=" << fd << "): " << strerror(errno));
+                return false;
+            }
+        }
+        else if(n == 0){
+            LOG_WARNING_STREAM("Send returned 0 (fd=" << fd << ")");
+            return false;
+        }
+        
+        sent += n;
+    }
+
+    return false;
+}
+
+void Responser::sendWithEpoll(ConnectionPtr conn, int fd, const std::string& message){
+    if(!conn || conn->isClosed()) {
+        LOG_WARNING_STREAM("Cannot send to closed connection fd=" << fd);
+        return;
+    }
+    
+    if(!epoll_instance){
+        LOG_ERROR("Epoll instance is null");
+        return;
+    }
+
+    if(conn->isWriting()){
+        conn->queueWrite(message);
+        LOG_DEBUG_STREAM("Connection fd=" << fd << " already writing, queued " << message.size() << " bytes (queue size: " << conn->getWriteQueueSize() << ")");
+        return;
+    }
+
+    size_t sent = 0;
+    bool would_block = trySend(fd, message.data(), message.size(), sent);
+
+    if(!would_block && sent == message.size()){
+        LOG_DEBUG_STREAM("Sent complete message to fd=" << fd << " (" << message.size() << " bytes)");
+        return;
+    }
+
+    if(sent < message.size()){
+        std::string remaining(message.data() + sent, message.size() - sent);
+        conn->setPartialWrite(std::move(remaining));
+        conn->setWriting(true);
+        
+        LOG_DEBUG_STREAM("Partial send on fd=" << fd << ": sent=" << sent << "/" << message.size() << ", enabling EPOLLOUT");
+        
+        epoll_instance->enableWrite(fd, [this](int write_fd){
+            this->handleWritable(write_fd);
+        });
+    }
+    }
+
+void Responser::handleWritable(int fd){
+    auto conn = epoll_instance->getConnection(fd);
+    if(!conn || conn->isClosed()){
+        epoll_instance->disableWrite(fd);
+        LOG_DEBUG_STREAM("Connection closed, disabled EPOLLOUT for fd=" << fd);
+        return;
+    }
+
+    if(conn->hasPartialWrite()){
+        std::string data = conn->getPartialWrite();
+        size_t sent = 0;
+        bool would_block = trySend(fd, data.data(), data.size(), sent);
+        
+        if(sent < data.size()){
+            std::string remaining(data.data() + sent, data.size() - sent);
+            conn->setPartialWrite(std::move(remaining));
+            LOG_DEBUG_STREAM("EPOLLOUT fd=" << fd << ": still blocked, sent=" << sent << "/" << data.size());
+            return;
+        }
+        
+        LOG_DEBUG_STREAM("EPOLLOUT fd=" << fd << ": completed partial write (" << data.size() << " bytes)");
+    }
+
+    while(conn->hasWriteData()){
+        std::string data = conn->popWriteData();
+        if(data.empty()) break;
+        
+        size_t sent = 0;
+        bool would_block = trySend(fd, data.data(), data.size(), sent);
+        
+        if(sent < data.size()){
+            std::string remaining(data.data() + sent, data.size() - sent);
+            conn->setPartialWrite(std::move(remaining));
+            LOG_DEBUG_STREAM("EPOLLOUT fd=" << fd << ": blocked on queue item, sent=" << sent << "/" << data.size());
+            return;
+        }
+        
+        LOG_DEBUG_STREAM("EPOLLOUT fd=" << fd << ": sent queued message (" << data.size() << " bytes)");
+    }
+
+    conn->setWriting(false);
+    epoll_instance->disableWrite(fd);
+    LOG_DEBUG_STREAM("EPOLLOUT fd=" << fd << ": queue empty, disabled EPOLLOUT");
+}
+
 void Responser::sendToClient(HandlerResponsePtr resp){
     if(!resp || !resp->connection){
         LOG_WARNING("Attempted to send to null connection");
+        return;
+    }
+
+    if(!epoll_instance){
+        LOG_ERROR("Epoll instance is null");
         return;
     }
 
@@ -90,68 +206,21 @@ void Responser::sendToClient(HandlerResponsePtr resp){
         receiver_id = receiver_user_id.value();
     }
 
-    thread_pool->submit([msg_id, resp, full_message, sender_id, receiver_id](){
-        if(!resp || !resp->connection){
-            LOG_WARNING("Attempted to send to null connection");
-            return;
-        }
+    auto conn = resp->connection;
+    int user_destination = resp->user_destination;
 
-        auto conn = resp->connection;
-        int user_destination = resp->user_destination;
+    if(!conn || conn->isClosed()){
+        return;
+    }
 
-        if(!conn || conn->isClosed()){
-            return;
-        }
+    int fd = conn->getFd();
+    if(fd < 0){
+        return;
+    }
 
-        int fd = conn->getFd();
-        if(fd < 0){
-            return;
-        }
+    ackMgr.addPendingMessage(msg_id, resp, conn, sender_id, receiver_id);
 
-        MessageAckManager::getInstance().addPendingMessage(msg_id, resp, conn, sender_id, receiver_id);
-
-        const char* data = full_message.data();
-        size_t remaining = full_message.size();
-        int retry_count = 0;
-        const int MAX_RETRIES = 3;
-
-        while(remaining > 0 && retry_count < MAX_RETRIES){
-            if(conn->isClosed()) break;
-            
-            ssize_t sent = send(user_destination, data, remaining, MSG_NOSIGNAL);
-            
-            if(sent < 0){
-                if(errno == EAGAIN || errno == EWOULDBLOCK){
-                    usleep(1000);
-                    retry_count++;
-                    continue;
-                }
-                else if(errno == EPIPE || errno == ECONNRESET){
-                    LOG_DEBUG_STREAM("Connection closed during send (fd=" << fd << ")");
-                    break;
-                }
-                else{
-                    LOG_ERROR_STREAM("Send error (fd=" << fd << "): " << strerror(errno));
-                    break;
-                }
-                perror("send");
-                break;
-            }
-            else if(sent == 0){
-                LOG_WARNING_STREAM("Send returned 0 (fd=" << fd << ")");
-                break;
-            }
-            else{
-                data += sent;
-                remaining -= sent;
-                retry_count = 0;
-            }
-        }
-        
-        if(remaining > 0){
-            LOG_WARNING_STREAM("Failed to send complete message (fd=" << fd << ", " << remaining << " bytes remaining)");
-        }
-    });
+    sendWithEpoll(conn, user_destination, full_message);
 }
 
 void Responser::sendBackToClient(HandlerResponsePtr resp){
@@ -159,6 +228,12 @@ void Responser::sendBackToClient(HandlerResponsePtr resp){
         LOG_WARNING("Attempted to send to null connection");
         return;
     }
+    
+    if(!epoll_instance){
+        LOG_ERROR("Epoll instance is null");
+        return;
+    }
+    
     auto& ackMgr = MessageAckManager::getInstance();
     auto& userMgr = UserManager::getInstance();
     
@@ -171,65 +246,20 @@ void Responser::sendBackToClient(HandlerResponsePtr resp){
         sender_id = sender_user_id.value();
     }
 
-    thread_pool->submit([msg_id, resp, full_message, sender_id](){
-        if(!resp || !resp->connection){
-            LOG_WARNING("Attempted to send to null connection");
-            return;
-        }
+    auto conn = resp->connection;
 
-        auto conn = resp->connection;
+    if(!conn || conn->isClosed()){
+        return;
+    }
+    
+    int fd = conn->getFd();
+    if(fd < 0){
+        return;
+    }
 
-        if(!conn || conn->isClosed()){
-            return;
-        }        
-        int fd = conn->getFd();
-        if(fd < 0){
-            return;
-        }
+    ackMgr.addPendingMessage(msg_id, resp, conn, sender_id, sender_id);
 
-        MessageAckManager::getInstance().addPendingMessage(msg_id, resp, conn, sender_id, sender_id);
-
-        const char* data = full_message.data();
-        size_t remaining = full_message.size();
-        int retry_count = 0;
-        const int MAX_RETRIES = 3;
-
-        while(remaining > 0 && retry_count < MAX_RETRIES){
-            if(conn->isClosed()) break;
-            
-            ssize_t sent = send(fd, data, remaining, MSG_NOSIGNAL);
-            
-            if(sent < 0){
-                if(errno == EAGAIN || errno == EWOULDBLOCK){
-                    usleep(1000);
-                    retry_count++;
-                    continue;
-                }
-                else if(errno == EPIPE || errno == ECONNRESET){
-                    LOG_DEBUG_STREAM("Connection closed during send (fd=" << fd << ")");
-                    break;
-                }
-                else{
-                    LOG_ERROR_STREAM("Send error (fd=" << fd << "): " << strerror(errno));
-                    break;
-                }
-                perror("send");
-                break;
-            }
-            else if(sent == 0){
-                LOG_WARNING_STREAM("Send returned 0 (fd=" << fd << ")");
-                break;
-            }
-            else{
-                data += sent;
-                remaining -= sent;
-                retry_count = 0;
-            }
-        }
-        if(remaining > 0){
-            LOG_WARNING_STREAM("Failed to send complete message (fd=" << fd << ", " << remaining << " bytes remaining)");
-        }
-    });
+    sendWithEpoll(conn, fd, full_message);
 }
 
 void Responser::broadcastToRoom(HandlerResponsePtr resp){
@@ -238,8 +268,12 @@ void Responser::broadcastToRoom(HandlerResponsePtr resp){
         return;
     }
 
-    PublicChatRoom tmp;
-    auto& room = tmp.getInstance();
+    if(!epoll_instance){
+        LOG_ERROR("Epoll instance is null");
+        return;
+    }
+
+    auto& room = PublicChatRoom::getInstance();
     auto members = room.getParticipants();
     LOG_DEBUG_STREAM("[Broadcast] Sending to " << members.size() << " members in public chat room");
     
@@ -255,45 +289,7 @@ void Responser::broadcastToRoom(HandlerResponsePtr resp){
             continue;
         }
         
-        thread_pool->submit([conn, content = resp->response_message, member_fd](){
-            if(!conn || conn->isClosed()) return;
-            
-            const char* data = content.data();
-            size_t remaining = content.size();
-            int retry_count = 0;
-            const int MAX_RETRIES = 3;
-
-            while(remaining > 0 && retry_count < MAX_RETRIES){
-                if(conn->isClosed()) break;
-                
-                ssize_t sent = send(member_fd, data, remaining, MSG_NOSIGNAL);
-                
-                if(sent < 0){
-                    if(errno == EAGAIN || errno == EWOULDBLOCK){
-                        usleep(1000);
-                        retry_count++;
-                        continue;
-                    }
-                    else if(errno == EPIPE || errno == ECONNRESET){
-                        LOG_DEBUG_STREAM("[Broadcast] Connection closed (fd=" << member_fd << ")");
-                        break;
-                    }
-                    else{
-                        LOG_ERROR_STREAM("[Broadcast] Send error (fd=" << member_fd << "): " << strerror(errno));
-                        break;
-                    }
-                }
-                else if(sent == 0){
-                    break;
-                }
-                else{
-                    data += sent;
-                    remaining -= sent;
-                    retry_count = 0;
-                }
-            }
-        });
-        
+        sendWithEpoll(conn, member_fd, resp->response_message);
         sent_count++;
     }
     

@@ -22,8 +22,7 @@ CommandPtr CommandParser::parse(std::string& message, IncomingMessage& incomming
             return cmd;
         }
         
-        PublicChatRoom temp_public_chat_room;
-        auto& room = temp_public_chat_room.getInstance();
+        auto& room = PublicChatRoom::getInstance();
         if(!room.isParticipant(conn->getFd())){
             cmd->type = CommandType::UNKNOWN;
         }
@@ -55,8 +54,7 @@ CommandPtr CommandParser::parse(std::string& message, IncomingMessage& incomming
     else if(command_name == "/list_online_users"){
         auto conn = epoll_instance->getConnection(incomming.fd);
 
-        PublicChatRoom temp_public_chat_room;
-        auto& room = temp_public_chat_room.getInstance();
+        auto& room = PublicChatRoom::getInstance();
         if(!room.isParticipant(conn->getFd())){
             cmd->type = CommandType::LIST_ONLINE_USERS;
         }

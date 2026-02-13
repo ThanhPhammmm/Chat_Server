@@ -29,7 +29,6 @@ void LeavePublicChatThreadHandler::run(){
             resp->connection = req->connection;
             resp->response_message = response;
             resp->fd = req->fd;
-            resp->request_id = req->request_id;
             resp->destination = response.find("Error:") == 0 ? 
                                ResponseDestination::ERROR_TO_CLIENT : 
                                ResponseDestination::DIRECT_TO_CLIENT;

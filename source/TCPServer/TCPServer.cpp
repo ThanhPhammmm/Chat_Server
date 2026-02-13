@@ -103,6 +103,13 @@ void TCPServer::onRead(int clientFd){
             continue;
         }
 
+        if(content.substr(0, 4) == "ACK|"){
+            std::string msg_id = content.substr(4);
+            MessageAckManager::getInstance().acknowledgeMessage(msg_id);
+            LOG_DEBUG_STREAM("[ACK] Received ACK for " << msg_id << " from fd=" << clientFd);
+            continue;
+        }
+
         Message msg;
         msg.type = MessageType::INCOMING_MESSAGE;
         msg.payload = IncomingMessage{conn, content, clientFd};

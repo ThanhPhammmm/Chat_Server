@@ -7,6 +7,7 @@
 #include <atomic>
 #include <string>
 #include <chrono>
+#include <sstream>
 
 constexpr size_t BUFFER_SIZE = 4096;
 
@@ -19,12 +20,17 @@ void setNonBlocking(int fd){
     }
 }
 
+void sendAck(int sock, const std::string& msg_id){
+    std::string ack = "ACK|" + msg_id;
+    send(sock, ack.c_str(), ack.size(), MSG_NOSIGNAL);
+}
+
 void receiveThread(int sock){
     char buffer[BUFFER_SIZE];
     
     while(running.load()){
         memset(buffer, 0, BUFFER_SIZE);
-        ssize_t n = recv(sock, buffer, BUFFER_SIZE - 1, 0);  // Leave room for null terminator
+        ssize_t n = recv(sock, buffer, BUFFER_SIZE - 1, 0);
         
         if(n < 0){
             if(errno == EAGAIN || errno == EWOULDBLOCK){
@@ -45,12 +51,29 @@ void receiveThread(int sock){
             break;
         }
         
-        // Safe: n is at most BUFFER_SIZE-1
         buffer[n] = '\0';
+        std::string received(buffer);
         
-        std::cout << "\r\033[K";  // Clear line
-        std::cout << "📨 [Server]: " << buffer << std::endl;
-        std::cout << "💬 You: " << std::flush;
+        // Parse message format: MSG_ID|content
+        size_t delimiter_pos = received.find('|');
+        if(delimiter_pos != std::string::npos){
+            std::string msg_id = received.substr(0, delimiter_pos);
+            std::string content = received.substr(delimiter_pos + 1);
+            
+            // Send ACK back to server
+            sendAck(sock, msg_id);
+            
+            // Display the message
+            std::cout << "\r\033[K";  // Clear line
+            std::cout << "📨 " << content << std::endl;
+            std::cout << "💬 You: " << std::flush;
+        }
+        else{
+            // Fallback for messages without MSG_ID (shouldn't happen)
+            std::cout << "\r\033[K";
+            std::cout << "📨 " << received << std::endl;
+            std::cout << "💬 You: " << std::flush;
+        }
     }
 }
 
@@ -105,7 +128,6 @@ int main(){
         
         if(msg.empty()) continue;
         
-        // Input validation - limit message size
         if(msg.size() > 4000){
             std::cout << "⚠️  Message too long (max 4000 chars)\n";
             continue;

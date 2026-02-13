@@ -13,7 +13,6 @@ class ChatControllerThread{
         EpollInstancePtr epoll_instance;
         std::thread worker_thread;
         std::atomic<bool> running{false};
-        std::atomic<int> request_counter{0};
 
         void run();
         void routeMessage(IncomingMessage& incoming, CommandParser& parser);

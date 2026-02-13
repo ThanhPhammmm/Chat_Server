@@ -39,6 +39,11 @@ int main(){
     LOG_INFO_STREAM("Main Thread: " << std::this_thread::get_id());
 
     try{
+        LOG_DEBUG("Starting ACK manager...");
+        auto ackMgr = std::make_shared<MessageAckThreadHandler>();
+        ackMgr->start();
+        LOG_DEBUG("ACK manager started");
+
         // 0. START DATABASE THREAD
         LOG_DEBUG("Starting database thread...");
         auto db_thread = std::make_shared<DataBaseThread>();

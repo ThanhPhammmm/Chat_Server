@@ -27,7 +27,6 @@ void LogoutChatThreadHandler::run(){
             resp->connection = req->connection;
             resp->response_message = response;
             resp->fd = req->fd;
-            resp->request_id = req->request_id;
             resp->destination = ResponseDestination::BACK_TO_CLIENT;
             resp->exclude_fd = -1;
             resp->user_destination = -1;

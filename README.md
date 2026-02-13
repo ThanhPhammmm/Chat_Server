@@ -1,5 +1,7 @@
 Improvement:
 - User account deletion
+- ACK
+- Resend
 
 BUG:
 - Now it is free

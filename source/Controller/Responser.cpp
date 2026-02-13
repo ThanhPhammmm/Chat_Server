@@ -1,6 +1,7 @@
 #include "Responser.h"
 #include "PublicChatRoom.h"
 #include "Logger.h"
+#include "MessageAckManager.h"
 
 Responser::Responser(std::shared_ptr<MessageQueue<HandlerResponsePtr>> resp_queue,
                      ThreadPoolPtr pool,
@@ -68,18 +69,36 @@ void Responser::sendToClient(HandlerResponsePtr resp){
         LOG_WARNING("Attempted to send to null connection");
         return;
     }
-    thread_pool->submit([conn = resp->connection, content = resp->response_message, user_destination = resp->user_destination](){
+
+    auto& ackMgr = MessageAckManager::getInstance();
+    std::string msg_id = ackMgr.generateMessageId();
+    std::string full_message = msg_id + "|" + resp->response_message;
+
+    thread_pool->submit([msg_id, resp, full_message](){
+        if(!resp || !resp->connection){
+            LOG_WARNING("Attempted to send to null connection");
+            return;
+        }
+        auto conn = resp->connection;
+        int user_destination = resp->user_destination;
+        std::string content = resp->response_message;
+
         if(!conn || conn->isClosed()){
             return;
-        }        
+        }
+
         int fd = conn->getFd();
         if(fd < 0){
             return;
-        }        
-        const char* data = content.data();
-        size_t remaining = content.size();
+        }
+
+        MessageAckManager::getInstance().addPendingMessage(msg_id, resp, conn);
+
+        const char* data = full_message.data();
+        size_t remaining = full_message.size();
         int retry_count = 0;
         const int MAX_RETRIES = 3;
+
         while(remaining > 0 && retry_count < MAX_RETRIES){
             if(conn->isClosed()) break;
             
@@ -123,18 +142,33 @@ void Responser::sendBackToClient(HandlerResponsePtr resp){
         LOG_WARNING("Attempted to send to null connection");
         return;
     }
-    thread_pool->submit([conn = resp->connection, content = resp->response_message](){
+    auto& ackMgr = MessageAckManager::getInstance();
+    std::string msg_id = ackMgr.generateMessageId();
+    std::string full_message = msg_id + "|" + resp->response_message;
+
+    thread_pool->submit([msg_id, resp, full_message](){
+        if(!resp || !resp->connection){
+            LOG_WARNING("Attempted to send to null connection");
+            return;
+        }
+        auto conn = resp->connection;
+        std::string content = resp->response_message;
+
         if(!conn || conn->isClosed()){
             return;
         }        
         int fd = conn->getFd();
         if(fd < 0){
             return;
-        }        
+        }
+
+        MessageAckManager::getInstance().addPendingMessage(msg_id, resp, conn);
+
         const char* data = content.data();
         size_t remaining = content.size();
         int retry_count = 0;
         const int MAX_RETRIES = 3;
+
         while(remaining > 0 && retry_count < MAX_RETRIES){
             if(conn->isClosed()) break;
             

@@ -72,11 +72,7 @@ std::string LoginChatHandler::handleMessage(ConnectionPtr conn, CommandPtr comma
             (void)msg;
             std::lock_guard<std::mutex> lock1(result_mutex);
             if(success){
-                auto& dbMgr = DataBaseManager::getInstance();
-                auto user_opt = dbMgr.getUser(username);
-                if(user_opt.has_value()){
-                    user_id = user_opt.value().id;
-                }
+                user_id = std::stoi(msg);
             }
             user_fetched = true;
             result_cv.notify_one();

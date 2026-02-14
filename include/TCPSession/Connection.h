@@ -33,6 +33,14 @@ class Connection{
         std::atomic<bool> writing{false};
         std::string partial_write;
 
+        std::deque<std::chrono::steady_clock::time_point> message_timestamps;
+        std::mutex rate_limit_mutex;
+        static constexpr size_t MAX_MESSAGES_PER_WINDOW = 20;
+        static constexpr std::chrono::seconds RATE_LIMIT_WINDOW{10};
+
+        std::chrono::steady_clock::time_point last_activity;
+        std::mutex activity_mutex;
+
     public:
         explicit Connection(int socket_fd);
         ~Connection();
@@ -59,6 +67,13 @@ class Connection{
         void setPartialWrite(std::string data) { partial_write = std::move(data); }
         std::string getPartialWrite() { return std::move(partial_write); }
         bool hasPartialWrite() const { return !partial_write.empty(); }
+
+        bool isRateLimited();
+        void recordMessage();
+
+        void updateActivity();
+        std::chrono::seconds getIdleTime();
+        bool isIdle(std::chrono::seconds timeout);
 };
 
 using ConnectionPtr = std::shared_ptr<Connection>;

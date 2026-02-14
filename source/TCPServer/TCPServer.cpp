@@ -11,9 +11,7 @@ static void setNonBlock(int fd){
     }
 }
 
-TCPServer::TCPServer(const sockaddr_in& addr, 
-                     EpollInstancePtr epoll, 
-                     std::shared_ptr<MessageQueue<Message>> to_router)
+TCPServer::TCPServer(const sockaddr_in& addr, EpollInstancePtr epoll, std::shared_ptr<MessageQueue<Message>> to_router)
     : epoll_instance(epoll), 
       to_router_queue(to_router){ 
     
@@ -64,6 +62,7 @@ void TCPServer::onRead(int clientFd){
         return;
     }
     
+    conn->updateActivity();
     size_t total_bytes_read = 0;
 
     while(true){
@@ -101,14 +100,65 @@ void TCPServer::onRead(int clientFd){
             continue;
         }
 
-        if(content.substr(0, 4) == "ACK|"){
-            std::string msg_id = content.substr(4);
-            if(!msg_id.empty() && msg_id.find('|') == std::string::npos){
-                MessageAckManager::getInstance().acknowledgeMessage(msg_id);
-                LOG_DEBUG_STREAM("[ACK] Received ACK for " << msg_id);
+        if(content.length() >= 4 && content.compare(0, 4, "ACK|") == 0){
+            if(content.length() > 4){
+                std::string msg_id = content.substr(4);
+                
+                size_t end_pos = msg_id.find_first_of("\r\n");
+                if(end_pos != std::string::npos){
+                    msg_id = msg_id.substr(0, end_pos);
+                }
+                
+                bool valid = false;
+                if(msg_id.length() >= 14 && msg_id.compare(0, 4, "MSG_") == 0){
+                    valid = true;
+                    for(size_t i = 4; i < msg_id.length() && i < 14; ++i){
+                        if(!std::isdigit(msg_id[i])){
+                            valid = false;
+                            break;
+                        }
+                    }
+                    
+                    if(msg_id.length() > 14){
+                        valid = false;
+                    }
+                }
+                
+                if(valid){
+                    MessageAckManager::getInstance().acknowledgeMessage(msg_id);
+                    LOG_DEBUG_STREAM("[ACK] Received ACK for " << msg_id);
+                }
+                else{
+                    LOG_WARNING_STREAM("[ACK] Malformed ACK message ID from fd=" << clientFd << ": '" << msg_id << "'");
+                }
+            }
+            else{
+                LOG_WARNING_STREAM("[ACK] Empty ACK message received from fd=" << clientFd);
             }
             continue;
         }
+
+        bool has_invalid_chars = false;
+        for(char c : content){
+            if(c == '\0' || (c < 32 && c != '\n' && c != '\r' && c != '\t')){
+                has_invalid_chars = true;
+                break;
+            }
+        }
+        
+        if(has_invalid_chars){
+            LOG_WARNING_STREAM("Invalid characters in message from fd=" << clientFd << ", ignoring");
+            continue;
+        }
+
+        if(conn->isRateLimited()){
+            LOG_WARNING_STREAM("[RATE_LIMIT] Client fd=" << clientFd << " is sending too fast, dropping message");
+            std::string warning = "0|Warning: Rate limit exceeded. Slow down your messages.\n";
+            send(clientFd, warning.c_str(), warning.size(), MSG_NOSIGNAL);
+            continue;
+        }
+        
+        conn->recordMessage();
 
         Message msg;
         msg.type = MessageType::INCOMING_MESSAGE;

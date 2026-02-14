@@ -66,6 +66,7 @@ void MessageAckManager::resendMessage(const PendingMessage& msg){
     
     if(!msg.responser){
         LOG_ERROR_STREAM("[ACK] Cannot resend - null response for " << msg.message_id);
+        updateMessageStatusInDB(msg.message_id, "failed");
         return;
     }
     
@@ -75,30 +76,48 @@ void MessageAckManager::resendMessage(const PendingMessage& msg){
     
     if(target_fd < 0){
         LOG_ERROR_STREAM("[ACK] Invalid target_fd for resend: " << msg.message_id);
+        updateMessageStatusInDB(msg.message_id, "failed");
         return;
     }
     
     const char* data = full_msg.data();
     size_t remaining = full_msg.size();
-    
-    while(remaining > 0){
-        ssize_t sent = send(target_fd, data, remaining, MSG_NOSIGNAL);
+    size_t total_sent = 0;
+
+    int send_attempts = 0;
+    const int MAX_SEND_ATTEMPTS = 10;
+
+    while(remaining > 0 && send_attempts < MAX_SEND_ATTEMPTS ){
+        ssize_t sent = send(target_fd, data + total_sent, remaining, MSG_NOSIGNAL | MSG_DONTWAIT);
         
         if(sent < 0){
             if(errno == EAGAIN || errno == EWOULDBLOCK){
-                usleep(1000);
+                send_attempts++;
+                if(send_attempts >= MAX_SEND_ATTEMPTS){
+                    LOG_ERROR_STREAM("[ACK] Resend blocked after " << MAX_SEND_ATTEMPTS << " attempts for " << msg.message_id);
+                    updateMessageStatusInDB(msg.message_id, "failed");
+                    return;
+                }
+                usleep(100);
                 continue;
             }
-            LOG_ERROR_STREAM("[ACK] Resend failed for " << msg.message_id << " to fd=" << target_fd << ": " << strerror(errno));
             
+            LOG_ERROR_STREAM("[ACK] Resend failed for " << msg.message_id << " to fd=" << target_fd << ": " << strerror(errno));
             updateMessageStatusInDB(msg.message_id, "failed");
             return;
         }
-        
-        data += sent;
+
+        total_sent += sent;
         remaining -= sent;
+        send_attempts = 0;
     }
     
+    if(remaining > 0){
+        LOG_ERROR_STREAM("[ACK] Partial resend for " << msg.message_id << ", sent=" << total_sent << "/" << full_msg.size());
+        updateMessageStatusInDB(msg.message_id, "failed");
+        return;
+    }
+
     LOG_INFO_STREAM("[ACK] Resent message " << msg.message_id << " to fd=" << target_fd << " (retry " << msg.retry_count + 1 << ")");
     
     if(db_thread){
@@ -122,8 +141,8 @@ void MessageAckManager::checkTimeouts(){
         if(elapsed >= ACK_TIMEOUT_MS){
             if(pending.retry_count >= pending.max_retries){
                 LOG_WARNING_STREAM("[ACK] Message " << msg_id << " failed after " << pending.max_retries << " retries, marking as failed");
-                
                 updateMessageStatusInDB(msg_id, "failed");
+                //removeMessageFromDB(msg_id);
                 to_remove.push_back(msg_id);
             }
             else{
@@ -138,6 +157,11 @@ void MessageAckManager::checkTimeouts(){
     for(const auto& msg_id : to_remove){
         pending_messages.erase(msg_id);
     }
+        
+    static int check_count = 0;
+    if(++check_count % 60 == 0){
+        LOG_DEBUG_STREAM("[ACK] Stats: " << pending_messages.size() << " pending messages");
+    }
 }
 
 void MessageAckManager::persistPendingMessage(const PendingMessage& msg){
@@ -151,12 +175,15 @@ void MessageAckManager::persistPendingMessage(const PendingMessage& msg){
     req->message_id = msg.message_id;
     req->sender_id = msg.sender_id;
     req->receiver_id = msg.receiver_id;
-    req->callback = [msg_id = msg.message_id](bool success, std::string& result){
+
+    // Capture msg_id by value to avoid dangling reference
+    std::string msg_id_copy = msg.message_id;
+    req->callback = [msg_id_copy](bool success, std::string& result){
         if(success){
-            LOG_DEBUG_STREAM("[ACK] Persisted message to DB: " << msg_id);
+            LOG_DEBUG_STREAM("[ACK] Persisted message to DB: " << msg_id_copy);
         }
         else{
-            LOG_ERROR_STREAM("[ACK] Failed to persist message: " << msg_id << " - " << result);
+            LOG_ERROR_STREAM("[ACK] Failed to persist message: " << msg_id_copy << " - " << result);
         }
     };
     
@@ -172,9 +199,12 @@ void MessageAckManager::updateMessageStatusInDB(const std::string& msg_id, const
     req->type = DBOperationType::UPDATE_MESSAGE_STATUS;
     req->message_id = msg_id;
     req->status = status;
-    req->callback = [msg_id, status](bool success, std::string& result){
+
+    std::string msg_id_copy = msg_id;
+    std::string status_copy = status;
+    req->callback = [msg_id_copy, status_copy](bool success, std::string& result){
         if(success){
-            LOG_DEBUG_STREAM("[ACK] Updated message " << msg_id << " status to: " << status);
+            LOG_DEBUG_STREAM("[ACK] Updated message " << msg_id_copy << " status to: " << status_copy);
         }
         else{
             LOG_ERROR_STREAM("[ACK] Failed to update status: " << result);
@@ -192,9 +222,11 @@ void MessageAckManager::removeMessageFromDB(const std::string& msg_id){
     auto req = std::make_shared<DBRequest>();
     req->type = DBOperationType::DELETE_PENDING_MESSAGE;
     req->message_id = msg_id;
-    req->callback = [msg_id](bool success, std::string& result){
+
+    std::string msg_id_copy = msg_id;
+    req->callback = [msg_id_copy](bool success, std::string& result){
         if(success){
-            LOG_DEBUG_STREAM("[ACK] Removed message from DB: " << msg_id);
+            LOG_DEBUG_STREAM("[ACK] Removed message from DB: " << msg_id_copy);
         }
         else{
             LOG_ERROR_STREAM("[ACK] Failed to remove from DB: " << result);
@@ -217,6 +249,9 @@ void MessageAckManager::loadPendingMessagesFromDB(){
     req->callback = [this](bool success, std::string& result){
         if(success){
             LOG_INFO_STREAM("[ACK] " << result);
+            // Note: Actual restoration of PendingMessage objects would require
+            // mapping user IDs back to current connections, which may not exist yet
+            // This is mainly for auditing/cleanup of stale messages
         }
         else{
             LOG_ERROR_STREAM("[ACK] Failed to load pending messages: " << result);
@@ -224,8 +259,4 @@ void MessageAckManager::loadPendingMessagesFromDB(){
     };
     
     db_thread->submitRequest(req);
-    
-    // Note: The actual loading and reconstruction of PendingMessage objects
-    // would require additional logic to map user IDs back to current connections.
-    // This is a simplified version showing the database integration pattern.
 }

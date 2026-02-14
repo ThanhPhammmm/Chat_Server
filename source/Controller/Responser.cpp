@@ -197,6 +197,7 @@ void Responser::sendToClient(HandlerResponsePtr resp){
     int receiver_id = -1;
 
     auto sender_user_id = userMgr.getUserId(resp->fd);
+    LOG_DEBUG_STREAM("Sender fd=" << resp->fd << " maps to user_id=" << (sender_user_id.has_value() ? std::to_string(sender_user_id.value()) : "N/A"));
     if(sender_user_id.has_value()){
         sender_id = sender_user_id.value();
     }

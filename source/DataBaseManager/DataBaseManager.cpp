@@ -120,6 +120,10 @@ bool DataBaseManager::registerUser(const std::string& username, const std::strin
     sqlite3_bind_text(stmt, 2, pwd_hash.c_str(), -1, SQLITE_TRANSIENT);
     
     rc = sqlite3_step(stmt);
+
+    LOG_INFO_STREAM("rc = " << rc);
+    LOG_INFO_STREAM("errmsg = " << sqlite3_errmsg(db));
+
     sqlite3_finalize(stmt);
     
     if(rc != SQLITE_DONE){
@@ -231,6 +235,9 @@ bool DataBaseManager::addPendingMessage(const std::string& message_id, int sende
     rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
     
+    LOG_INFO_STREAM("rc = " << rc);
+    LOG_INFO_STREAM("errmsg = " << sqlite3_errmsg(db));
+
     if(rc != SQLITE_DONE){
         LOG_ERROR_STREAM("Failed to add pending message: " << sqlite3_errmsg(db));
         return false;
@@ -338,6 +345,8 @@ std::optional<User> DataBaseManager::getUser(const std::string& username){
     sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_TRANSIENT);
     
     rc = sqlite3_step(stmt);
+    LOG_INFO_STREAM("rc = " << rc);
+    LOG_INFO_STREAM("errmsg = " << sqlite3_errmsg(db));
     
     std::optional<User> user;
     if(rc == SQLITE_ROW){
@@ -349,7 +358,7 @@ std::optional<User> DataBaseManager::getUser(const std::string& username){
         
         const char* last_login = (const char*)sqlite3_column_text(stmt, 4);
         u.last_login = last_login ? last_login : "";
-        
+        LOG_INFO_STREAM("Inside getUser - Found id = " << u.id);
         user = u;
     }
     

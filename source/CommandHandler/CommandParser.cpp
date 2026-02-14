@@ -1,6 +1,49 @@
 #include "CommandParser.h"
 #include "PublicChatRoom.h"
 
+static std::vector<std::string> parseArguments(const std::string& input){
+    std::vector<std::string> args;
+    std::string current;
+    bool in_quotes = false;
+    bool escape_next = false;
+    
+    for(size_t i = 0; i < input.length(); i++){
+        char c = input[i];
+        
+        if(escape_next){
+            current += c;
+            escape_next = false;
+            continue;
+        }
+        
+        if(c == '\\'){
+            escape_next = true;
+            continue;
+        }
+        
+        if(c == '"'){
+            in_quotes = !in_quotes;
+            continue;
+        }
+        
+        if(!in_quotes && (c == ' ' || c == '\t')){
+            if(!current.empty()){
+                args.push_back(current);
+                current.clear();
+            }
+            continue;
+        }
+        
+        current += c;
+    }
+    
+    if(!current.empty()){
+        args.push_back(current);
+    }
+    
+    return args;
+}
+
 CommandPtr CommandParser::parse(std::string& message, IncomingMessage& incomming, EpollInstancePtr epoll_instance){
     auto cmd = std::make_shared<Command>();
     cmd->raw_message = message;
@@ -33,13 +76,17 @@ CommandPtr CommandParser::parse(std::string& message, IncomingMessage& incomming
         return cmd;
     }
 
-    std::istringstream iss(message);
-    std::string command_name;
-    iss >> command_name;
-
-    std::string arg;
-    while(iss >> arg){
-        cmd->args.push_back(arg);
+    std::vector<std::string> tokens = parseArguments(message);
+    
+    if(tokens.empty()){
+        cmd->type = CommandType::UNKNOWN;
+        return cmd;
+    }
+    
+    std::string command_name = tokens[0];
+    
+    for(size_t i = 1; i < tokens.size(); i++){
+        cmd->args.push_back(tokens[i]);
     }
 
     if(command_name == "/register"){

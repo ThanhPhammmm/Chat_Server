@@ -26,17 +26,23 @@ std::string PublicChatHandler::handleMessage(ConnectionPtr conn, CommandPtr comm
     }
 
     if(command->type == CommandType::LIST_USERS_IN_PUBLIC_CHAT_ROOM){
-        std::string list = "Users in public chat:\n";
+        std::ostringstream oss;
+        oss << "Users in public chat:\n";
+        
         int count = 0;
         for(auto& participant_fd : room.getParticipants()){
             auto username = userMgr.getUsername(participant_fd);
             if(username.has_value()){
-                list += "  - " + username.value() + "\n";
+                oss << "  - " << username.value() << "\n";
                 count++;
             }
         }
-        if(count == 0) list += "  (none)\n";
-        return list;
+        
+        if(count == 0){
+            oss << "  (none)\n";
+        }
+        
+        return oss.str();
     }
     
     if(command->args.empty()){
@@ -44,12 +50,17 @@ std::string PublicChatHandler::handleMessage(ConnectionPtr conn, CommandPtr comm
     }
     
     std::string username = userMgr.getUsername(fd).value();
-    std::string full_message = command->args[0];
+    
+    std::ostringstream msg_builder;
+    msg_builder << command->args[0];
     for(size_t i = 1; i < command->args.size(); i++){
-        full_message += " " + command->args[i];
+        msg_builder << " " << command->args[i];
     }
     
     std::string timestamp = TimeUtils::getCurrentTimestamp();
     
-    return "[" + timestamp + "] [Public] " + username + ": " + full_message;
+    std::ostringstream result;
+    result << "[" << timestamp << "] [Public] " << username << ": " << msg_builder.str();
+    
+    return result.str();
 }

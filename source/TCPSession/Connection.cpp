@@ -96,3 +96,26 @@ void Connection::clearWriteQueue(){
     partial_write.clear();
     writing.store(false, std::memory_order_release);
 }
+
+bool Connection::isRateLimited(){
+    std::lock_guard<std::mutex> lock(rate_limit_mutex);
+    
+    auto now = std::chrono::steady_clock::now();
+    auto cutoff = now - RATE_LIMIT_WINDOW;
+    
+    while(!message_timestamps.empty() && message_timestamps.front() < cutoff){
+        message_timestamps.pop_front();
+    }
+    
+    return message_timestamps.size() >= MAX_MESSAGES_PER_WINDOW;
+}
+
+void Connection::recordMessage(){
+    std::lock_guard<std::mutex> lock(rate_limit_mutex);
+    message_timestamps.push_back(std::chrono::steady_clock::now());
+}
+
+void Connection::updateActivity(){
+    std::lock_guard<std::mutex> lock(activity_mutex);
+    last_activity = std::chrono::steady_clock::now();
+}

@@ -172,7 +172,7 @@ void Logger::setLogFile(const std::string& filename){
 }
 
 void Logger::pushLog(LogLevel level, const std::string& message, const std::string& file, int line){
-    if(level != current_level){
+    if(level < current_level){
         return;
     }
     

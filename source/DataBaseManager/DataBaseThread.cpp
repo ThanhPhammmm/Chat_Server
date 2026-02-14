@@ -83,8 +83,14 @@ void DataBaseThread::processRequest(DBRequestPtr req){
         case DBOperationType::GET_USER:
             {
                 auto user = db_manager->getUser(req->username);
-                success = user.has_value();
-                message = success ? "User found" : "User not found";
+                if(user.has_value()){
+                    success = true;
+                    message = std::to_string(user->id);
+                }
+                else{
+                    success = false;
+                    message = "User not found";
+                }
             }
             break;
 
@@ -124,8 +130,6 @@ void DataBaseThread::processRequest(DBRequestPtr req){
     }
     
     if(req->callback){
-        LOG_DEBUG_STREAM("User logged in1");
         req->callback(success, message);
-        LOG_DEBUG_STREAM("User logged in2");
     }
 }

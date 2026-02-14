@@ -24,7 +24,7 @@ void setNonBlocking(int fd){
 }
 
 void sendAck(int sock, const std::string& msg_id){
-    std::string ack = "ACK|" + msg_id;
+    std::string ack = "ACK|" + msg_id + "\n";
     send(sock, ack.c_str(), ack.size(), MSG_NOSIGNAL);
 }
 
@@ -174,10 +174,12 @@ int main(){
             std::cout << "⚠️  Message too long (max 4000 chars)\n";
             continue;
         }
+    
+        std::string full_msg = msg + "\n";
         
         size_t total_sent = 0;
-        size_t remaining = msg.size();
-        const char* data = msg.c_str();
+        size_t remaining = full_msg.size();
+        const char* data = full_msg.c_str();
         
         while(remaining > 0 && running.load()){
             ssize_t sent = send(sock, data + total_sent, remaining, MSG_NOSIGNAL);

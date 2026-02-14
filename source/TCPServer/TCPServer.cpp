@@ -63,7 +63,6 @@ void TCPServer::onRead(int clientFd){
     }
     
     conn->updateActivity();
-    size_t total_bytes_read = 0;
 
     while(true){
         char buf[BUFFER_SIZE];
@@ -85,42 +84,41 @@ void TCPServer::onRead(int clientFd){
             return;
         }
         
-        total_bytes_read += n;
+        buf[n] = '\0';
+        std::string received_data(buf, n);
         
-        // Prevent DoS by limiting message size
-        if(total_bytes_read > MAX_MESSAGE_SIZE){
-            LOG_WARNING_STREAM("Message too large from fd=" << clientFd << " (" << total_bytes_read << " bytes), closing connection");
+        conn->appendReadBuffer(received_data);
+        
+        if(conn->getReadBufferSize() > MAX_MESSAGE_SIZE){
+            LOG_WARNING_STREAM("Read buffer too large for fd=" << clientFd << " (" << conn->getReadBufferSize() << " bytes), closing connection");
             epoll_instance->removeFd(clientFd);
             return;
         }
 
-        buf[n] = '\0';
-        std::string content(buf, n);
-        if(content.empty()){
-            continue;
+        LOG_DEBUG_STREAM("[TCPServer] Received " << n << " bytes from fd=" << clientFd << ", buffer size now: " << received_data.size());
+    }
+    
+    while(true){
+        std::string complete_msg = conn->extractCompleteMessage();
+        
+        if(complete_msg.empty()){
+            break;
         }
-
-        if(content.length() >= 4 && content.compare(0, 4, "ACK|") == 0){
-            if(content.length() > 4){
-                std::string msg_id = content.substr(4);
-                
-                size_t end_pos = msg_id.find_first_of("\r\n");
-                if(end_pos != std::string::npos){
-                    msg_id = msg_id.substr(0, end_pos);
-                }
+        
+        LOG_DEBUG_STREAM("[TCPServer] Extracted complete message from fd=" << clientFd << ": '" << complete_msg << "'");
+        
+        if(complete_msg.length() >= 4 && complete_msg.compare(0, 4, "ACK|") == 0){
+            if(complete_msg.length() > 4){
+                std::string msg_id = complete_msg.substr(4);
                 
                 bool valid = false;
-                if(msg_id.length() >= 14 && msg_id.compare(0, 4, "MSG_") == 0){
+                if(msg_id.length() == 14 && msg_id.compare(0, 4, "MSG_") == 0){
                     valid = true;
-                    for(size_t i = 4; i < msg_id.length() && i < 14; ++i){
+                    for(size_t i = 4; i < 14; ++i){
                         if(!std::isdigit(msg_id[i])){
                             valid = false;
                             break;
                         }
-                    }
-                    
-                    if(msg_id.length() > 14){
-                        valid = false;
                     }
                 }
                 
@@ -137,9 +135,9 @@ void TCPServer::onRead(int clientFd){
             }
             continue;
         }
-
+        
         bool has_invalid_chars = false;
-        for(char c : content){
+        for(char c : complete_msg){
             if(c == '\0' || (c < 32 && c != '\n' && c != '\r' && c != '\t')){
                 has_invalid_chars = true;
                 break;
@@ -150,7 +148,7 @@ void TCPServer::onRead(int clientFd){
             LOG_WARNING_STREAM("Invalid characters in message from fd=" << clientFd << ", ignoring");
             continue;
         }
-
+        
         if(conn->isRateLimited()){
             LOG_WARNING_STREAM("[RATE_LIMIT] Client fd=" << clientFd << " is sending too fast, dropping message");
             std::string warning = "0|Warning: Rate limit exceeded. Slow down your messages.\n";
@@ -159,14 +157,13 @@ void TCPServer::onRead(int clientFd){
         }
         
         conn->recordMessage();
-
+        
         Message msg;
         msg.type = MessageType::INCOMING_MESSAGE;
-        msg.payload = IncomingMessage{conn, content, clientFd};
+        msg.payload = IncomingMessage{conn, complete_msg, clientFd};
         to_router_queue->push(std::move(msg));
-
-        LOG_DEBUG_STREAM("[TCPServer] Received " << n << " bytes from fd=" << clientFd);
-        LOG_DEBUG_STREAM("[TCPServer] Pushed message from fd=" << clientFd << " to router queue");
+        
+        LOG_DEBUG_STREAM("[TCPServer] Pushed complete message from fd=" << clientFd << " to router queue");
     }
 }
 

@@ -33,6 +33,9 @@ class Connection{
         std::atomic<bool> writing{false};
         std::string partial_write;
 
+        std::string read_buffer;
+        std::mutex read_mutex;
+
         std::deque<std::chrono::steady_clock::time_point> message_timestamps;
         std::mutex rate_limit_mutex;
         static constexpr size_t MAX_MESSAGES_PER_WINDOW = 20;
@@ -55,6 +58,7 @@ class Connection{
         bool isClosed();
         void close();
 
+        // Write
         void queueWrite(std::string data);
         bool hasWriteData();
         std::string popWriteData();
@@ -68,9 +72,14 @@ class Connection{
         std::string getPartialWrite() { return std::move(partial_write); }
         bool hasPartialWrite() const { return !partial_write.empty(); }
 
+        // Read
+        void appendReadBuffer(const std::string& data);
+        std::string extractCompleteMessage();
+        void clearReadBuffer();
+        size_t getReadBufferSize();
+        
         bool isRateLimited();
         void recordMessage();
-
         void updateActivity();
 };
 

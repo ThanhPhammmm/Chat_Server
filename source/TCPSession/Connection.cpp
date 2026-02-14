@@ -58,6 +58,7 @@ void Connection::close(){
     }
 }
 
+// Write methods
 void Connection::queueWrite(std::string data){
     if(data.empty()) return;
     std::lock_guard<std::mutex> lock(write_mutex);
@@ -95,6 +96,37 @@ void Connection::clearWriteQueue(){
     write_queue.clear();
     partial_write.clear();
     writing.store(false, std::memory_order_release);
+}
+
+// Read methods
+void Connection::appendReadBuffer(const std::string& data){
+    std::lock_guard<std::mutex> lock(read_mutex);
+    read_buffer.append(data);
+}
+
+std::string Connection::extractCompleteMessage(){
+    std::lock_guard<std::mutex> lock(read_mutex);
+    
+    size_t pos = read_buffer.find('\n');
+    if(pos == std::string::npos){
+        return "";
+    }
+    
+    std::string message = read_buffer.substr(0, pos);
+    
+    read_buffer.erase(0, pos + 1);
+    
+    return message;
+}
+
+void Connection::clearReadBuffer(){
+    std::lock_guard<std::mutex> lock(read_mutex);
+    read_buffer.clear();
+}
+
+size_t Connection::getReadBufferSize(){
+    std::lock_guard<std::mutex> lock(read_mutex);
+    return read_buffer.size();
 }
 
 bool Connection::isRateLimited(){

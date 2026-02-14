@@ -20,6 +20,7 @@ struct PendingMessage{
     int max_retries;
     int sender_id;
     int receiver_id;
+    std::string message_content;
     
     PendingMessage() : retry_count(0), max_retries(3), sender_id(-1), receiver_id(-1) {}
 };
@@ -45,7 +46,7 @@ class MessageAckManager{
         void setDatabaseThread(DataBaseThreadPtr db_thread);
 
         std::string generateMessageId();
-        void addPendingMessage(const std::string& msg_id, HandlerResponsePtr response, ConnectionPtr conn, int sender_id, int receiver_id);        
+        void addPendingMessage(const std::string& msg_id, HandlerResponsePtr response, ConnectionPtr conn, int sender_id, int receiver_id, const std::string& message_content);
         void acknowledgeMessage(const std::string& msg_id);
         void checkTimeouts();
         void resendMessage(const PendingMessage& msg);
@@ -53,5 +54,6 @@ class MessageAckManager{
         void persistPendingMessage(const PendingMessage& msg);
         void updateMessageStatusInDB(const std::string& msg_id, const std::string& status);
         void removeMessageFromDB(const std::string& msg_id);
-        void loadPendingMessagesFromDB();  // Load on startup
+        //void loadPendingMessagesFromDB();  // Load on startup
+        void sendPendingMessagesToUser(int user_id, int fd, ConnectionPtr conn);
 };

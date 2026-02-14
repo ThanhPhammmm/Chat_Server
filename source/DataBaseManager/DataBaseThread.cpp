@@ -95,7 +95,7 @@ void DataBaseThread::processRequest(DBRequestPtr req){
             break;
 
         case DBOperationType::ADD_PENDING_MESSAGE:
-            success = db_manager->addPendingMessage(req->message_id, req->sender_id, req->receiver_id);
+            success = db_manager->addPendingMessage(req->message_id, req->sender_id, req->receiver_id, req->message_content);
             message = success ? "Message added to pending queue" : "Failed to add message";
             break;
 
@@ -113,17 +113,14 @@ void DataBaseThread::processRequest(DBRequestPtr req){
             message = success ? "Message removed from pending queue" : "Failed to remove message";
             break;
 
-        case DBOperationType::GET_PENDING_MESSAGES:
+        case DBOperationType::GET_PENDING_MESSAGES_FOR_USER:
             {
-                auto pending_msgs = db_manager->getPendingMessages();
+                req->pending_messages = db_manager->getPendingMessagesForUser(req->user_id);
                 success = true;
-                message = "Loaded " + std::to_string(pending_msgs.size()) + " pending messages";
+                message = "Loaded " + std::to_string(req->pending_messages.size()) + " pending messages for user";
                 
-                if(!pending_msgs.empty()){
-                    LOG_INFO_STREAM("Found " << pending_msgs.size() << " pending messages:");
-                    for(const auto& msg : pending_msgs){
-                        LOG_DEBUG_STREAM("  - " << msg.message_id << " from user_id=" << msg.sender_id << " to user_id=" << msg.receiver_id<< " status=" << msg.status<< " retries=" << msg.retry_count);
-                    }
+                if(!req->pending_messages.empty()){
+                    LOG_INFO_STREAM("Found " << req->pending_messages.size() << " pending messages for user_id=" << req->user_id);
                 }
             }
             break;

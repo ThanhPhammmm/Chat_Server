@@ -8,10 +8,13 @@
 #include <string>
 #include <chrono>
 #include <sstream>
+#include <unordered_set>
 
 constexpr size_t BUFFER_SIZE = 4096;
 
 std::atomic<bool> running{true};
+std::string message_buffer;
+std::unordered_set<std::string> processed_messages;
 
 void setNonBlocking(int fd){
     int flags = fcntl(fd, F_GETFL, 0);
@@ -23,6 +26,63 @@ void setNonBlocking(int fd){
 void sendAck(int sock, const std::string& msg_id){
     std::string ack = "ACK|" + msg_id;
     send(sock, ack.c_str(), ack.size(), MSG_NOSIGNAL);
+}
+
+bool isValidMessageId(const std::string& msg_id){
+    if(msg_id.length() != 14) return false;
+    if(msg_id.substr(0, 4) != "MSG_") return false;
+    
+    for(size_t i = 4; i < 14; i++){
+        if(!std::isdigit(msg_id[i])) return false;
+    }
+    
+    return true;
+}
+
+void processMessage(int sock, const std::string& msg_id, const std::string& content){
+    if(processed_messages.count(msg_id)){
+        std::cout << "[DEBUG] Duplicate message " << msg_id << ", sending ACK again\n";
+        sendAck(sock, msg_id);
+        return;
+    }
+    
+    std::cout << "\r\033[K";
+    std::cout << "📨 " << content << std::endl;
+    std::cout << "💬 You: " << std::flush;
+    
+    processed_messages.insert(msg_id);
+    
+    if(processed_messages.size() > 1000){
+        auto it = processed_messages.begin();
+        std::advance(it, 500);
+        processed_messages.erase(processed_messages.begin(), it);
+    }
+    
+    sendAck(sock, msg_id);
+}
+
+void parseBuffer(int sock){
+    size_t pos;
+    while((pos = message_buffer.find('\n')) != std::string::npos){
+        std::string line = message_buffer.substr(0, pos);
+        message_buffer.erase(0, pos + 1);
+        
+        size_t delim = line.find('|');
+        if(delim == std::string::npos){
+            std::cout << "[DEBUG] Invalid message format (no delimiter): " << line << "\n";
+            continue;
+        }
+        
+        std::string msg_id = line.substr(0, delim);
+        std::string content = line.substr(delim + 1);
+        
+        if(!isValidMessageId(msg_id)){
+            std::cout << "[DEBUG] Invalid MSG_ID: " << msg_id << "\n";
+            continue;
+        }
+        
+        processMessage(sock, msg_id, content);
+    }
 }
 
 void receiveThread(int sock){
@@ -48,32 +108,14 @@ void receiveThread(int sock){
             std::cout <<     "║  Server closed connection          ║\n";
             std::cout <<     "╚════════════════════════════════════╝\n";
             running.store(false);
+            
+            message_buffer.clear();
             break;
         }
         
-        buffer[n] = '\0';
-        std::string received(buffer);
+        message_buffer.append(buffer, n);
         
-        // Parse message format: MSG_ID|content
-        size_t delimiter_pos = received.find('|');
-        if(delimiter_pos != std::string::npos){
-            std::string msg_id = received.substr(0, delimiter_pos);
-            std::string content = received.substr(delimiter_pos + 1);
-            
-            // Send ACK back to server
-            sendAck(sock, msg_id);
-            
-            // Display the message
-            std::cout << "\r\033[K";  // Clear line
-            std::cout << "📨 " << content << std::endl;
-            std::cout << "💬 You: " << std::flush;
-        }
-        else{
-            // Fallback for messages without MSG_ID (shouldn't happen)
-            std::cout << "\r\033[K";
-            std::cout << "📨 " << received << std::endl;
-            std::cout << "💬 You: " << std::flush;
-        }
+        parseBuffer(sock);
     }
 }
 

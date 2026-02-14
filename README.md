@@ -1,7 +1,7 @@
 Improvement:
 - User account deletion
-- ACK
-- Resend
+- ACK + Resend
+- Resend all message to users who disconnected accidently when logging again
 
 BUG:
 - ACK failed
@@ -10,4 +10,5 @@ BUG:
 
 Test:
 - Check all diagrams
-- ACK
+- ACK + Resend
+- Resend all message to users who disconnected accidently when logging again

@@ -2,6 +2,7 @@
 #include "UserManager.h"
 #include "TimeUtils.h"
 #include "Logger.h"
+#include "MessageAckManager.h"
 
 LoginChatHandler::LoginChatHandler(DataBaseThreadPtr db_thread) : db_thread(db_thread) {}
 
@@ -87,6 +88,9 @@ std::string LoginChatHandler::handleMessage(ConnectionPtr conn, CommandPtr comma
         
         std::string timestamp = TimeUtils::getCurrentTimestamp();
         LOG_INFO_STREAM("User logged in: " << username << " (fd=" << fd << ", user_id=" << user_id << ")");
+
+        auto& ackMgr = MessageAckManager::getInstance();
+        ackMgr.sendPendingMessagesToUser(user_id, fd, conn);
         return "[" + timestamp + "] Success: Logged in as " + username + " (user_id=" + std::to_string(user_id) + ")";
     }
     

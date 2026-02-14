@@ -14,7 +14,7 @@ enum class DBOperationType{
     ADD_PENDING_MESSAGE,
     UPDATE_MESSAGE_STATUS,
     DELETE_PENDING_MESSAGE,
-    GET_PENDING_MESSAGES
+    GET_PENDING_MESSAGES_FOR_USER
 };
 
 struct DBRequest{
@@ -22,13 +22,15 @@ struct DBRequest{
     std::string username;
     std::string password;
     int fd;
-    int request_id;
+    int user_id;
     std::function<void(bool success, std::string&)> callback;
 
     int sender_id;
     int receiver_id;
     std::string message_id;
+    std::string message_content;
     std::string status;
+    std::vector<PendingMessageRecord> pending_messages;
 };
 
 using DBRequestPtr = std::shared_ptr<DBRequest>;

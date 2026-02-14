@@ -113,6 +113,8 @@ void ChatControllerThread::routeMessage(IncomingMessage& incoming, CommandParser
             req->user_desntination = target_fd.value();
         } 
         else req->user_desntination = -1;
+
+        LOG_DEBUG_STREAM("[Router] Routing private message to user " << cmd->args[0] << " with fd=" << req->user_desntination);
     }
     else{
         req->user_desntination = -1;

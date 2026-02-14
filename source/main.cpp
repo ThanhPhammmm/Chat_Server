@@ -50,7 +50,7 @@ int main(){
         ackMgr.setDatabaseThread(db_thread);
         
         // 0. Load any pending messages from previous session
-        ackMgr.loadPendingMessagesFromDB();
+        //ackMgr.loadPendingMessagesFromDB();
         LOG_DEBUG("ACK manager initialized");
         
         // 0. START ACK MANAGER THREAD

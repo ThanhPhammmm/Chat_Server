@@ -20,6 +20,7 @@ struct PendingMessageRecord{
     std::string message_id;
     int sender_id;
     int receiver_id;
+    std::string message_content;
     std::string status;  // 'pending', 'sent', 'acknowledged', 'failed'
     std::string created_at;
     std::string last_retry_at;
@@ -47,11 +48,11 @@ class DataBaseManager{
         bool updateLastLogin(const std::string& username);
         std::optional<User> getUser(const std::string& username);
 
-        bool addPendingMessage(const std::string& message_id, int sender_id, int receiver_id);
+        bool addPendingMessage(const std::string& message_id, int sender_id, int receiver_id, const std::string& message_content);
         bool updateMessageStatus(const std::string& message_id, const std::string& status);
         bool deletePendingMessage(const std::string& message_id);
         bool incrementRetryCount(const std::string& message_id);
-        std::vector<PendingMessageRecord> getPendingMessages();
+        std::vector<PendingMessageRecord> getPendingMessagesForUser(int user_id); // NEW: Get pending messages for specific user
 };
 
 using DatabaseManagerPtr = std::shared_ptr<DataBaseManager>;

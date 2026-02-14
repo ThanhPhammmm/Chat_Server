@@ -141,6 +141,7 @@ void Responser::handleWritable(int fd){
 
     while(conn->hasWriteData()){
         std::string data = conn->popWriteData();
+        LOG_DEBUG_STREAM("EPOLLOUT fd=" << fd << ": attempting to send queued message (" << data.size() << " bytes)");
         if(data.empty()) break;
         
         size_t sent = 0;
@@ -176,7 +177,9 @@ void Responser::sendToClient(HandlerResponsePtr resp){
     auto& userMgr = UserManager::getInstance();
     
     std::string msg_id = ackMgr.generateMessageId();
-    std::string full_message = msg_id + "|" + resp->response_message;
+
+    // Format: MSG_ID|content\n
+    std::string full_message = msg_id + "|" + resp->response_message + "\n";
 
     int sender_id = -1;
     int receiver_id = -1;
@@ -192,21 +195,20 @@ void Responser::sendToClient(HandlerResponsePtr resp){
         receiver_id = receiver_user_id.value();
     }
 
-    auto conn = resp->connection;
-    int user_destination = resp->user_destination;
-
-    if(!conn || conn->isClosed()){
+    int receiver_fd = resp->user_destination;
+    auto target_conn = epoll_instance->getConnection(receiver_fd);
+    if(!target_conn || target_conn->isClosed()){
+        LOG_WARNING_STREAM("Receiver connection closed (fd=" << receiver_fd << "), saving to DB for later");
+        
+        if(receiver_id > 0){
+            ackMgr.addPendingMessage(msg_id, resp, nullptr, sender_id, receiver_id, resp->response_message);
+        }
         return;
     }
 
-    int fd = conn->getFd();
-    if(fd < 0){
-        return;
-    }
-
-    ackMgr.addPendingMessage(msg_id, resp, conn, sender_id, receiver_id);
-
-    sendWithEpoll(conn, user_destination, full_message);
+    ackMgr.addPendingMessage(msg_id, resp, target_conn, sender_id, receiver_id, resp->response_message);
+    
+    sendWithEpoll(target_conn, receiver_fd, full_message);
 }
 
 void Responser::sendBackToClient(HandlerResponsePtr resp){
@@ -224,7 +226,7 @@ void Responser::sendBackToClient(HandlerResponsePtr resp){
     auto& userMgr = UserManager::getInstance();
     
     std::string msg_id = ackMgr.generateMessageId();
-    std::string full_message = msg_id + "|" + resp->response_message;
+    std::string full_message = msg_id + "|" + resp->response_message + "\n";
 
     int sender_id = -1;
     auto sender_user_id = userMgr.getUserId(resp->fd);
@@ -243,7 +245,7 @@ void Responser::sendBackToClient(HandlerResponsePtr resp){
         return;
     }
 
-    ackMgr.addPendingMessage(msg_id, resp, conn, sender_id, sender_id);
+    ackMgr.addPendingMessage(msg_id, resp, conn, sender_id, sender_id, resp->response_message);
 
     sendWithEpoll(conn, fd, full_message);
 }
@@ -263,6 +265,8 @@ void Responser::broadcastToRoom(HandlerResponsePtr resp){
     auto members = room.getParticipants();
     LOG_DEBUG_STREAM("[Broadcast] Sending to " << members.size() << " members in public chat room");
     
+    std::string broadcast_msg = resp->response_message + "\n";
+
     int sent_count = 0;
     for(int member_fd : members){
         if(resp->exclude_fd >= 0 && member_fd == resp->exclude_fd){
@@ -275,7 +279,7 @@ void Responser::broadcastToRoom(HandlerResponsePtr resp){
             continue;
         }
         
-        sendWithEpoll(conn, member_fd, resp->response_message);
+        sendWithEpoll(conn, member_fd, broadcast_msg);
         sent_count++;
     }
     

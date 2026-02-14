@@ -72,8 +72,6 @@ class Connection{
         void recordMessage();
 
         void updateActivity();
-        std::chrono::seconds getIdleTime();
-        bool isIdle(std::chrono::seconds timeout);
 };
 
 using ConnectionPtr = std::shared_ptr<Connection>;

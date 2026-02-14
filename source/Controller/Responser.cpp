@@ -104,32 +104,17 @@ void Responser::sendWithEpoll(ConnectionPtr conn, int fd, const std::string& mes
         return;
     }
 
-    if(conn->isWriting()){
-        conn->queueWrite(message);
-        LOG_DEBUG_STREAM("Connection fd=" << fd << " already writing, queued " << message.size() << " bytes (queue size: " << conn->getWriteQueueSize() << ")");
-        return;
-    }
-
-    size_t sent = 0;
-    bool would_block = trySend(fd, message.data(), message.size(), sent);
-
-    if(!would_block && sent == message.size()){
-        LOG_DEBUG_STREAM("Sent complete message to fd=" << fd << " (" << message.size() << " bytes)");
-        return;
-    }
-
-    if(sent < message.size()){
-        std::string remaining(message.data() + sent, message.size() - sent);
-        conn->setPartialWrite(std::move(remaining));
+    conn->queueWrite(message);
+    LOG_DEBUG_STREAM("Queued " << message.size() << " bytes to fd=" << fd << " (queue size: " << conn->getWriteQueueSize() << ")");
+    
+    if(!conn->isWriting()){
         conn->setWriting(true);
-        
-        LOG_DEBUG_STREAM("Partial send on fd=" << fd << ": sent=" << sent << "/" << message.size() << ", enabling EPOLLOUT");
-        
         epoll_instance->enableWrite(fd, [this](int write_fd){
             this->handleWritable(write_fd);
         });
+        LOG_DEBUG_STREAM("Enabled EPOLLOUT for fd=" << fd);
     }
-    }
+}
 
 void Responser::handleWritable(int fd){
     auto conn = epoll_instance->getConnection(fd);

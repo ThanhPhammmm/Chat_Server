@@ -17,20 +17,26 @@ std::string ListUsersHandler::handleMessage(ConnectionPtr conn, CommandPtr comma
     auto& userMgr = UserManager::getInstance();
     int fd = conn->getFd();
     if(!userMgr.isLoggedIn(fd)){
-        return "Error: Please log in first\n" ;
+        return "Error: Please log in first" ;
     }
 
     auto all_users = userMgr.getAllLoggedInUsers();
     std::string timestamp = TimeUtils::getCurrentTimestamp();
-    std::string user_list = "[" + timestamp + "] Online Users:\n";
     
-    for(const auto& [fd, username] : all_users){
-        user_list += "  - " + username + " (fd=" + std::to_string(fd) + ")\n";
-    }
+    std::ostringstream oss;
+    oss << "[" << timestamp << "] Online Users (" << all_users.size() << "): ";
     
     if(all_users.empty()){
-        user_list += "  (none)\n";
+        oss << "(none)";
+    }
+    else{
+        bool first = true;
+        for(const auto& [user_fd, username] : all_users){
+            if(!first) oss << ", ";
+            oss << username;
+            first = false;
+        }
     }
     
-    return user_list;
+    return oss.str();
 }

@@ -55,6 +55,7 @@ void Connection::close(){
             }
         }
         clearWriteQueue();
+        clearReadBuffer();
     }
 }
 

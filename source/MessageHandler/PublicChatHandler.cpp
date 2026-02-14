@@ -2,6 +2,7 @@
 #include "PublicChatRoom.h"
 #include "UserManager.h"
 #include "TimeUtils.h"
+#include "MessageUtils.h"
 
 std::string PublicChatHandler::handleMessage(ConnectionPtr conn, CommandPtr command, EpollInstancePtr epoll_instance){
     (void)epoll_instance;
@@ -57,10 +58,12 @@ std::string PublicChatHandler::handleMessage(ConnectionPtr conn, CommandPtr comm
         msg_builder << " " << command->args[i];
     }
     
+    std::string user_message = MessageUtils::sanitize(msg_builder.str());
+
     std::string timestamp = TimeUtils::getCurrentTimestamp();
     
     std::ostringstream result;
-    result << "[" << timestamp << "] [Public] " << username << ": " << msg_builder.str();
+    result << "[" << timestamp << "] [Public] " << username << ": " << user_message;
     
     return result.str();
 }

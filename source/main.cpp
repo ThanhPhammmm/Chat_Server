@@ -104,7 +104,7 @@ int main(){
         LOG_DEBUG("Threads Handlers created");
 
         LOG_DEBUG("Creating ChatControllerThread...");
-        auto router = std::make_shared<ChatControllerThread>(to_incoming_queue, epoll_instance);
+        auto router = std::make_shared<ChatControllerThread>(to_incoming_queue, to_response_queue, epoll_instance);
         router->registerHandlerQueue(CommandType::REGISTER, to_register_queue);
         router->registerHandlerQueue(CommandType::LOGIN, to_login_queue);
         router->registerHandlerQueue(CommandType::LOGOUT, to_logout_queue);

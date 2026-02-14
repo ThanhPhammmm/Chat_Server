@@ -9,6 +9,7 @@
 class ChatControllerThread{
     private:
         std::shared_ptr<MessageQueue<Message>> incoming_queue;
+        std::shared_ptr<MessageQueue<HandlerResponsePtr>> response_queue;
         std::unordered_map<CommandType, std::shared_ptr<MessageQueue<HandlerRequestPtr>>> handler_queues;
         EpollInstancePtr epoll_instance;
         std::thread worker_thread;
@@ -19,7 +20,7 @@ class ChatControllerThread{
         // void handleDisconnect(const ClientDisconnected& disc);
 
     public:
-        ChatControllerThread(std::shared_ptr<MessageQueue<Message>> incoming_queue, EpollInstancePtr epoll_instance);
+        ChatControllerThread(std::shared_ptr<MessageQueue<Message>> incoming_queue, std::shared_ptr<MessageQueue<HandlerResponsePtr>> response_queue, EpollInstancePtr epoll_instance);
         void registerHandlerQueue(CommandType type, std::shared_ptr<MessageQueue<HandlerRequestPtr>> queue);
         void start();
         void stop();

@@ -151,7 +151,9 @@ void TCPServer::onRead(int clientFd){
         
         if(conn->isRateLimited()){
             LOG_WARNING_STREAM("[RATE_LIMIT] Client fd=" << clientFd << " is sending too fast, dropping message");
-            std::string warning = "0|Warning: Rate limit exceeded. Slow down your messages.\n";
+            auto& ackMgr = MessageAckManager::getInstance();
+            std::string msg_id = ackMgr.generateMessageId();
+            std::string warning = msg_id + "|Warning: Rate limit exceeded. Slow down your messages.\n";
             send(clientFd, warning.c_str(), warning.size(), MSG_NOSIGNAL);
             continue;
         }
